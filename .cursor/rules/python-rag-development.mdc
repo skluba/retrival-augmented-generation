@@ -1,0 +1,33 @@
+---
+description: Senior Python standards for Retrieval-Augmented Generation code
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Python RAG — Senior Practitioner Bar
+
+Treat this codebase like production RAG: correctness, observability, and controlled failure modes beat clever one-offs.
+
+## Architecture & Retrieval
+
+- **Separation**: keep ingestion/indexing, retrieval, reranking, and generation as clear boundaries with typed interfaces. Pass rich metadata (doc id, source, chunk index) alongside text.
+- **Retrieval hygiene**: deterministic chunk boundaries; configurable `top_k` and score thresholds. Document assumptions about embedding model dimension and normalization.
+- **Grounding**: never invent citations; cite only retrieved context. Prefer structured prompts that separate CONTEXT vs QUESTION.
+
+```python
+# ❌ BAD: One blob with no retrieval contract
+answer = llm.chat(user_message)
+
+# ✅ GOOD: Explicit retrieve → optional rerank → generate with cited context
+hits = retrieve(query, index, k=retrieve_k)
+chunks = rerank(query, hits)[:generate_k]
+answer = generate(query, chunks, require_citations=True)
+```
+
+## Code Quality & Ops
+
+- **Types & APIs**: annotate public functions; narrow exceptions at boundaries (`ValueError`, custom domain errors).
+- **I/O**: use context managers for files/HTTP/DB clients; reuse connection pools. Batch embeddings with bounded concurrency for bulk jobs.
+- **Testing**: unit-test chunkers, parsers, retrieval filters, and deterministic paths; use mocks for external APIs.
+- **Config**: keep secrets, API keys, model names, and index identifiers in env or config—not scattered hard-coded strings.
+- **Git**: honor the project rule: **each new feature on its own branch** before opening a PR or merging.

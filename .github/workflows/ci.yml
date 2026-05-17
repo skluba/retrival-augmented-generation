@@ -1,0 +1,59 @@
+name: Quality assurance
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python_qa_and_sonar:
+    runs-on: ubuntu-latest
+
+    env:
+      GOOGLE_CLOUD_PROJECT: ci-placeholder-project
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install project + tooling
+        run: pip install -e ".[dev]"
+
+      - name: Ruff check
+        run: ruff check .
+
+      - name: Ruff format
+        run: ruff format --check .
+
+      - name: pytest (coverage + junit)
+        run: |
+          mkdir -p reports
+          pytest \
+            --maxfail=1 \
+            --disable-warnings \
+            --cov=rag_pdf_app \
+            --cov-report=xml \
+            --junitxml=reports/junit-report.xml
+
+      - name: SonarQube Scan (default branch; requires secrets + reachable host)
+        if: >-
+          github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+          secrets.SONAR_TOKEN != '' &&
+          secrets.SONAR_HOST_URL != ''
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
