@@ -2,6 +2,9 @@ FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
+# uv from Astral's distroless image (pinned semver tag = resolved release artefact), not `pip install`.
+COPY --from=ghcr.io/astral-sh/uv:0.11.14 /uv /uvx /bin/
+
 # Ghostscript supports Camelot (`parse_pdf_bytes(..., run_camelot=True)`). Parsing skips Camelot
 # by default so production deployments that never enable it could omit this package.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -11,15 +14,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
  && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir "uv==0.11.14"
-
 COPY pyproject.toml uv.lock README.md /app/
+# `tool.uv.sources` points antlr4-python3-runtime + pylatexenc at vendored wheels (`uv sync --no-build`).
+COPY third_party/wheels /app/third_party/wheels
 COPY src /app/src
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
-RUN uv sync --frozen --python 3.12
+RUN uv sync --frozen --no-build --python 3.12
 
 ENV PATH="/app/.venv/bin:$PATH" \
     VIRTUAL_ENV="/app/.venv" \
