@@ -23,7 +23,7 @@ COPY src /app/src
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
-RUN uv sync --frozen --python 3.12
+RUN uv sync --frozen --no-build --python 3.12
 
 ENV PATH="/app/.venv/bin:$PATH" \
     VIRTUAL_ENV="/app/.venv" \

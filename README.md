@@ -1,3 +1,5 @@
+[![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=skluba_retrival-augmented-generation)](https://sonarcloud.io/summary/new_code?id=skluba_retrival-augmented-generation)
+
 # Retrieval-Augmented Generation (PDF Lab)
 
 Starter stack for a **Gemini-first PDF RAG** proof of concept:
