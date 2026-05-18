@@ -101,20 +101,25 @@ else:
             help="Text is extracted with pypdf, pdfminer layout, and optionally Docling.",
         )
 
-        if pdf_file:
-            if st.button("Parse PDF", type="primary"):
-                raw = pdf_file.getvalue()
-                with st.spinner("Running extractors (this can take a while)…"):
-                    parsed = parse_pdf_bytes(
-                        raw,
-                        pdf_file.name,
-                        settings=settings_obj,
-                        embed_image_base64=embed_b64,
-                        gemini_image_captions=gemini_caps,
-                        gemini_table_summaries=gemini_tbl,
-                        run_docling=run_docling,
-                    )
-                st.session_state["last_parsed_pdf"] = parsed
+        parse_clicked = st.button(
+            "Parse PDF",
+            type="primary",
+            disabled=(pdf_file is None),
+            help="Choose a PDF file first." if pdf_file is None else None,
+        )
+        if pdf_file is not None and parse_clicked:
+            raw = pdf_file.getvalue()
+            with st.spinner("Running extractors (this can take a while)…"):
+                parsed = parse_pdf_bytes(
+                    raw,
+                    pdf_file.name,
+                    settings=settings_obj,
+                    embed_image_base64=embed_b64,
+                    gemini_image_captions=gemini_caps,
+                    gemini_table_summaries=gemini_tbl,
+                    run_docling=run_docling,
+                )
+            st.session_state["last_parsed_pdf"] = parsed
 
         parsed_state = st.session_state.get("last_parsed_pdf")
         if parsed_state is not None:
