@@ -46,10 +46,10 @@ def test_repo_root_points_at_pyproject() -> None:
 
 @pytest.mark.parametrize(
     "filename",
-    ["RAG_evaluation_dataset - convertcsv.csv"],
+    ["RAG_evaluation_dataset-convertcsv.csv"],
 )
 @pytest.mark.skipif(
-    not (Path(__file__).resolve().parents[1] / "RAG_evaluation_dataset - convertcsv.csv").is_file(),
+    not (Path(__file__).resolve().parents[1] / "RAG_evaluation_dataset-convertcsv.csv").is_file(),
     reason="Full IFC evaluation CSV not present at repo root",
 )
 def test_csv_path_explicit(filename: str) -> None:

@@ -17,7 +17,7 @@ def load_ifc_eval_csv(path: Path | None = None) -> list[EvalGoldRow]:
     if not csv_path.is_file():
         raise FileNotFoundError(
             f"Evaluation CSV not found at {csv_path}. "
-            "Place `RAG_evaluation_dataset - convertcsv.csv` at the repository root "
+            "Place `RAG_evaluation_dataset-convertcsv.csv` at the repository root "
             "or pass --csv."
         )
 
