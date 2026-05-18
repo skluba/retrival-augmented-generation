@@ -78,9 +78,7 @@ def _neighbor_ids_fallback_page(
     layout_spines: list[TextSpan],
 ) -> tuple[str | None, str | None]:
     same_page = [
-        sp
-        for sp in layout_spines
-        if sp.page_index == tbl.page_index and sp.bbox is not None
+        sp for sp in layout_spines if sp.page_index == tbl.page_index and sp.bbox is not None
     ]
     aid = same_page[0].span_id if same_page else None
     bid = same_page[-1].span_id if len(same_page) > 1 else None
