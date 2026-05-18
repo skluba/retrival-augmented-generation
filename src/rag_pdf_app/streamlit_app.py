@@ -10,12 +10,7 @@ from typing import Any
 import streamlit as st
 from google.auth.exceptions import DefaultCredentialsError
 
-from rag_pdf_app.config import (
-    Settings,
-    bundled_ifc_annual_report_pdf_path,
-    clear_settings_cache,
-    get_settings,
-)
+from rag_pdf_app.config import Settings, clear_settings_cache, get_settings
 
 st.set_page_config(page_title="PDF RAG Lab", layout="wide")
 st.title("PDF RAG workspace")
@@ -72,7 +67,6 @@ else:
                 "GOOGLE_GENAI_USE_VERTEXAI": settings_obj.use_vertex_ai,
                 "VERTEX_GENERATIVE_MODEL": settings_obj.vertex_generative_model,
                 "VERTEX_EMBEDDING_MODEL": settings_obj.vertex_embedding_model,
-                "IFC_ANNUAL_REPORT_PDF_PATH": settings_obj.ifc_annual_report_pdf_path,
                 "RAG_QDRANT_COLLECTION": settings_obj.rag_qdrant_collection,
                 "QDRANT_URL": settings_obj.qdrant_url,
                 "LANGFUSE_HOST": settings_obj.langfuse_host,
@@ -226,7 +220,7 @@ else:
 
     with rag_tab:
         from rag_pdf_app.rag.embeddings import vertex_text_embeddings
-        from rag_pdf_app.rag.ingest import ingest_pdf_bytes_to_indexes, ingest_pdf_path
+        from rag_pdf_app.rag.ingest import ingest_pdf_bytes_to_indexes
         from rag_pdf_app.rag.query import run_phase1_rag
         from rag_pdf_app.rag.stores import load_faiss_index
 
@@ -244,26 +238,7 @@ else:
             help="Preferred: choose the annual report (or any text PDF) from your machine.",
         )
 
-        default_path = (
-            settings_obj.ifc_annual_report_pdf_path
-            or bundled_ifc_annual_report_pdf_path()
-            or ""
-        )
-        with st.expander("Advanced — ingest from a path on the server (optional)", expanded=False):
-            st.caption(
-                "Use only when the app runs where a PDF already exists on disk (e.g. CI, mounted "
-                "volume). Interactive use should rely on **Upload PDF** above."
-            )
-            pdf_path_in = st.text_input(
-                "Filesystem path to PDF",
-                value=default_path,
-                help="Optional. Set `IFC_ANNUAL_REPORT_PDF_PATH` in `.env` to pre-fill.",
-            )
-
         layout_chunks = st.checkbox("Structure-aware chunking (pdfminer)", value=True)
-        st.caption(
-            "If you both upload a file and enter a server path, **upload wins** for ingest."
-        )
         col_a, col_b = st.columns(2)
         with col_a:
             if st.button("Ingest & index", type="primary"):
@@ -278,17 +253,8 @@ else:
                                 name,
                                 use_layout_chunking=layout_chunks,
                             )
-                    elif pdf_path_in.strip():
-                        with st.spinner("Embedding + FAISS + Qdrant…"):
-                            outcome = ingest_pdf_path(
-                                settings_obj,
-                                pdf_path_in.strip(),
-                                use_layout_chunking=layout_chunks,
-                            )
                     else:
-                        st.warning(
-                            "Upload a PDF above, or open **Advanced** and provide a server path."
-                        )
+                        st.warning("Upload a PDF above to ingest.")
                         outcome = None
                     if outcome:
                         emb = vertex_text_embeddings(settings_obj)

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from langchain_community.vectorstores import FAISS
 
@@ -88,17 +87,4 @@ def ingest_pdf_bytes_to_indexes(
         faiss_path=str(out_dir.resolve()),
         qdrant_collection=settings.rag_qdrant_collection,
         notes=notes,
-    )
-
-
-def ingest_pdf_path(
-    settings: Settings,
-    pdf_path: str | Path,
-    *,
-    use_layout_chunking: bool = True,
-) -> IngestOutcome:
-    path = Path(pdf_path)
-    data = path.read_bytes()
-    return ingest_pdf_bytes_to_indexes(
-        settings, data, path.name, use_layout_chunking=use_layout_chunking
     )

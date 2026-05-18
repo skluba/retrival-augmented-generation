@@ -1,7 +1,6 @@
 """Application settings loaded from environment (never Gemini API keys; use GCP ADC)."""
 
 from functools import lru_cache
-from pathlib import Path
 
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,10 +34,6 @@ class Settings(BaseSettings):
     rag_qdrant_collection: str = Field(
         default="ifc_annual_report_chunks",
         validation_alias=AliasChoices("RAG_QDRANT_COLLECTION"),
-    )
-    ifc_annual_report_pdf_path: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("IFC_ANNUAL_REPORT_PDF_PATH"),
     )
     rag_chunk_size: int = Field(
         default=1200,
@@ -76,11 +71,3 @@ def get_settings() -> Settings:
 
 def clear_settings_cache() -> None:
     get_settings.cache_clear()
-
-
-def bundled_ifc_annual_report_pdf_path() -> str | None:
-    """Resolved path to the tracked IFC sample PDF at the repository root, if present."""
-
-    root = Path(__file__).resolve().parents[2]
-    candidate = root / "ifc-annual-report-2024-financials.pdf"
-    return str(candidate) if candidate.is_file() else None
