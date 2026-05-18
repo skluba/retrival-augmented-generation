@@ -104,9 +104,7 @@ Workflow `.github/workflows/ci.yml`:
 
 - **pre-commit**: runs **ruff** lint + formatter via `.pre-commit-config.yaml` (`pre-commit run --all-files`), matching what `pre-commit install` wires locally.
 - **pytest**: executes the suite plus writes `coverage.xml` and `reports/junit-report.xml` referenced by Sonar.
-- **Sonar scanner**: uploads only when:
-  - the workflow runs against the repo **default branch** (for example after merges to `main`), and  
-  - `SONAR_TOKEN` / `SONAR_HOST_URL` repository secrets exist.
+- **Sonar scanner**: runs on **push** to the repo **default branch** only (so `GITHUB_REF` resolves to `refs/heads/<default>`; pull_request runs use `refs/pull/...` and skip this step). It needs repository secrets `SONAR_TOKEN` and **`SONAR_HOST_URL`** reachable from GitHub-hosted runners (**`secrets.*` cannot be referenced in workflow `if:` expressions**, so the step is gated by branch/event only—the action still receives secrets via `env`).
 
 Because GitHub-hosted runners cannot reach a Sonarqube container bound to `localhost` on your laptop, CI needs a URL that resolves on the internet (managed Sonarqube/SonarCloud ingress, VPN-hosted runner, or another reachable endpoint).
 

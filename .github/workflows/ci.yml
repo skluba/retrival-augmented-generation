@@ -45,11 +45,11 @@ jobs:
             --cov-report=xml \
             --junitxml=reports/junit-report.xml
 
-      - name: SonarQube Scan (default branch; requires secrets + reachable host)
+      - name: SonarQube Scan (default branch pushes only)
+        # `secrets.*` cannot be used in `if:` (workflow validation fails). Tokens are passed via env below.
         if: >-
-          github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
-          secrets.SONAR_TOKEN != '' &&
-          secrets.SONAR_HOST_URL != ''
+          github.event_name == 'push' &&
+          github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         uses: SonarSource/sonarqube-scan-action@v4
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
