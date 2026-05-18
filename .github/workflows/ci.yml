@@ -43,11 +43,15 @@ jobs:
           uv build --wheel --out-dir "${DIST_DIR}" --python 3.12
           uv sync --frozen --extra dev --python 3.12 --no-install-project --no-build
           proj_version="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+          wheel="${DIST_DIR}/rag_pdf_app-${proj_version}-py3-none-any.whl"
+          req_file="${DIST_DIR}/rag_pdf_app_wheel.requirements.txt"
+          python3 -c "import hashlib, pathlib, sys; p = pathlib.Path(sys.argv[1]).resolve(); d = hashlib.sha256(p.read_bytes()).hexdigest(); print(f\"rag_pdf_app @ {p.as_uri()} --hash=sha256:{d}\")" "${wheel}" > "${req_file}"
           uv pip install \
             --python "${GITHUB_WORKSPACE}/.venv/bin/python" \
             --no-build \
             --no-deps \
-            "${DIST_DIR}/rag_pdf_app-${proj_version}-py3-none-any.whl"
+            --require-hashes \
+            -r "${req_file}"
 
       - name: Pre-commit (ruff lint + format)
         run: ${{ github.workspace }}/.venv/bin/pre-commit run --all-files --show-diff-on-failure
