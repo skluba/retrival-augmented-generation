@@ -18,7 +18,6 @@ COPY pyproject.toml uv.lock README.md /app/
 COPY ifc-annual-report-2024-financials.pdf /app/
 # `tool.uv.sources` points antlr4-python3-runtime + pylatexenc at vendored wheels (`uv sync --no-build`).
 COPY third_party/wheels /app/third_party/wheels
-COPY ifc-annual-report-2024-financials.pdf /app/
 COPY src /app/src
 
 ENV UV_COMPILE_BYTECODE=1 \
