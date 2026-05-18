@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -35,15 +35,27 @@ jobs:
           enable-cache: true
 
       - name: Sync environment (locked)
-        run: uv sync --frozen --extra dev --python 3.12
+        shell: bash
+        env:
+          DIST_DIR: ${{ runner.temp }}/rag_pdf_dist
+        run: |
+          mkdir -p "${DIST_DIR}"
+          uv build --wheel --out-dir "${DIST_DIR}" --python 3.12
+          uv sync --frozen --extra dev --python 3.12 --no-install-project --no-build
+          proj_version="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+          uv pip install \
+            --python "${GITHUB_WORKSPACE}/.venv/bin/python" \
+            --no-build \
+            --no-deps \
+            "${DIST_DIR}/rag_pdf_app-${proj_version}-py3-none-any.whl"
 
       - name: Pre-commit (ruff lint + format)
-        run: uv run pre-commit run --all-files --show-diff-on-failure
+        run: ${{ github.workspace }}/.venv/bin/pre-commit run --all-files --show-diff-on-failure
 
       - name: pytest (coverage + junit)
         run: |
           mkdir -p reports
-          uv run pytest \
+          ${{ github.workspace }}/.venv/bin/pytest \
             --maxfail=1 \
             --disable-warnings \
             --cov=rag_pdf_app \

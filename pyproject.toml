@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 authors = []
 
 dependencies = [
+  "antlr4-python3-runtime==4.9.3",
   "datasets>=3.0.0",
   "docling>=2.10.0",
   "faiss-cpu>=1.9.0",
@@ -18,6 +19,7 @@ dependencies = [
   "langchain-google-vertexai>=2.0.0",
   "langfuse>=2.0.0",
   "pydantic-settings>=2.7.0",
+  "pylatexenc==2.10",
   "pymupdf>=1.24.0",
   "qdrant-client>=1.11.0",
   "ragas>=0.2.6",
@@ -34,6 +36,11 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# PyPI publishes these only as sdists; vendor wheels so CI can run `uv sync --no-build`.
+[tool.uv.sources]
+antlr4-python3-runtime = { path = "third_party/wheels/antlr4_python3_runtime-4.9.3-py3-none-any.whl" }
+pylatexenc = { path = "third_party/wheels/pylatexenc-2.10-py3-none-any.whl" }
 
 [build-system]
 requires = ["setuptools>=75", "wheel"]
