@@ -54,9 +54,7 @@ except Exception as exc:  # noqa: BLE001
     st.error("Missing or invalid environment configuration.")
     st.exception(exc)
 else:
-    overview_tab, parsing_tab, rag_tab = st.tabs(
-        ["Overview", "PDF parsing", "Phase 1 · IFC RAG"]
-    )
+    overview_tab, parsing_tab, rag_tab = st.tabs(["Overview", "PDF parsing", "Phase 1 · IFC RAG"])
 
     with overview_tab:
         st.success("Loaded settings from environment.")

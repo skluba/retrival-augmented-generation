@@ -96,9 +96,7 @@ def load_faiss_index(embeddings: Embeddings, settings: Settings) -> FAISS:
             metadata=dict(meta) if isinstance(meta, dict) else {},
         )
     docstore = InMemoryDocstore(documents)
-    index_to_docstore_id = {
-        int(k): str(v) for k, v in manifest["index_to_docstore_id"].items()
-    }
+    index_to_docstore_id = {int(k): str(v) for k, v in manifest["index_to_docstore_id"].items()}
 
     return FAISS(
         embeddings,

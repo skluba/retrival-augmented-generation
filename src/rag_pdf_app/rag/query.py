@@ -1,7 +1,13 @@
-"""End-to-end Phase 1 query: dual retrieval + Gemini + optional Langfuse."""
+"""End-to-end Phase 1 query: dual retrieval + Gemini + optional Langfuse.
+
+Langfuse spans deliberately avoid sending raw end-user questions (PII/secrets). Only a SHA-256
+fingerprint and length are emitted; configure Langfuse access controls and data retention for
+your compliance regime.
+"""
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 
 from langchain_community.vectorstores import FAISS
@@ -28,6 +34,16 @@ def _optional_langfuse(settings: Settings):
     if not pk or not sk:
         return None
     return Langfuse(public_key=pk, secret_key=sk, host=settings.langfuse_host)
+
+
+def _langfuse_safe_query_metrics(query: str) -> dict[str, str | int]:
+    """Fingerprint the question for traces without shipping plaintext to Langfuse."""
+
+    digest = hashlib.sha256(query.encode("utf-8", errors="replace")).hexdigest()
+    return {
+        "query_char_length": len(query),
+        "query_sha256": digest,
+    }
 
 
 def _format_context_block(hits: list[RetrievalHit], *, max_chars: int = 12000) -> str:
@@ -65,7 +81,10 @@ def run_phase1_rag(
     *,
     faiss_store: FAISS,
 ) -> Phase1RagResult:
-    """Retrieve from FAISS + Qdrant, answer with Gemini; trace when Langfuse keys exist."""
+    """Retrieve from FAISS + Qdrant, answer with Gemini; trace when Langfuse keys exist.
+
+    Langfuse observations exclude raw user queries; see ``_langfuse_safe_query_metrics``.
+    """
 
     lf = _optional_langfuse(settings)
     embedder = vertex_text_embeddings(settings)
@@ -78,7 +97,7 @@ def run_phase1_rag(
     if lf is not None:
         with lf.start_as_current_observation(
             name="phase1_ifc_rag",
-            input={"query": query},
+            input=_langfuse_safe_query_metrics(query),
         ) as trace_obs:
             dual = retrieve_dual(
                 query=query,
