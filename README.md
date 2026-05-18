@@ -53,6 +53,12 @@ Copy env template:
 cp .env.example .env   # populate GOOGLE_CLOUD_PROJECT and related values
 ```
 
+4. **Locked dependencies** (CI and Docker use `uv sync --frozen`): after any change to `pyproject.toml`, refresh the lockfile with **Python 3.12** so versions stay reproducible:
+
+```bash
+uv lock --python 3.12
+```
+
 ---
 
 ## Run the stack locally
@@ -83,15 +89,14 @@ Sonar project keys live in `sonar-project.properties` for local scanner / CI upl
 
 Langfuse ingestion keys (`LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`) appear after onboarding in Langfuse UI; drop them into `.env` for tracing from Python apps.
 
-Dev install on the host:
+Dev install on the host (uses **uv** + `uv.lock`; [install uv](https://docs.astral.sh/uv/getting-started/installation/) if needed):
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-pre-commit install
-pre-commit run --all-files          # mirrors CI style checks once
-pytest --maxfail=1 --disable-warnings
-streamlit run src/rag_pdf_app/streamlit_app.py
+uv sync --frozen --extra dev --python 3.12
+uv run pre-commit install
+uv run pre-commit run --all-files   # mirrors CI style checks once
+uv run pytest --maxfail=1 --disable-warnings
+uv run streamlit run src/rag_pdf_app/streamlit_app.py
 ```
 
 Gemini invocation uses **`google-genai`** with **`vertexai=True`** (wired in `rag_pdf_app/vertex_gemini.py`).
@@ -102,8 +107,9 @@ Gemini invocation uses **`google-genai`** with **`vertexai=True`** (wired in `ra
 
 Workflow `.github/workflows/ci.yml`:
 
-- **pre-commit**: runs **ruff** lint + formatter via `.pre-commit-config.yaml` (`pre-commit run --all-files`), matching what `pre-commit install` wires locally.
-- **pytest**: executes the suite plus writes `coverage.xml` and `reports/junit-report.xml` referenced by Sonar.
+- **uv**: `uv sync --frozen --extra dev --python 3.12` so installs match the committed **`uv.lock`**.
+- **pre-commit**: runs **ruff** lint + formatter via `.pre-commit-config.yaml` (`uv run pre-commit run --all-files`).
+- **pytest**: `uv run pytest` plus `coverage.xml` and `reports/junit-report.xml` referenced by Sonar.
 - **Sonar scanner**: runs on **push** to the repo **default branch** only (so `GITHUB_REF` resolves to `refs/heads/<default>`; pull_request runs use `refs/pull/...` and skip this step). It needs repository secrets `SONAR_TOKEN` and **`SONAR_HOST_URL`** reachable from GitHub-hosted runners (**`secrets.*` cannot be referenced in workflow `if:` expressions**, so the step is gated by branch/event only—the action still receives secrets via `env`).
 
 Because GitHub-hosted runners cannot reach a Sonarqube container bound to `localhost` on your laptop, CI needs a URL that resolves on the internet (managed Sonarqube/SonarCloud ingress, VPN-hosted runner, or another reachable endpoint).
