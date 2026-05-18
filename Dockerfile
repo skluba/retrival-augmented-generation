@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir "uv==0.11.14"
 
 COPY pyproject.toml uv.lock README.md /app/
+COPY ifc-annual-report-2024-financials.pdf /app/
 COPY src /app/src
 
 ENV UV_COMPILE_BYTECODE=1 \

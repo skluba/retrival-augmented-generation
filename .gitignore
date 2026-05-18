@@ -19,3 +19,6 @@ build/
 data/
 
 reports/
+
+*.pdf
+!ifc-annual-report-2024-financials.pdf

@@ -14,4 +14,5 @@ def test_settings_roundtrip_via_cache() -> None:
 def test_settings_direct_instantiation() -> None:
     settings = Settings()
     assert settings.vertex_generative_model
+    assert settings.vertex_embedding_model
     assert settings.qdrant_url.startswith("http")

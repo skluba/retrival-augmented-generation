@@ -61,6 +61,21 @@ def generate_plain_text(prompt: str, settings: Settings) -> str:
     raise RuntimeError("Gemini returned no text; check quotas, IAM, or model availability.")
 
 
+def generate_rag_answer(user_prompt: str, settings: Settings) -> str:
+    """Longer-form generation for grounded RAG answers."""
+
+    client = client_for(settings)
+    response = client.models.generate_content(
+        model=settings.vertex_generative_model,
+        contents=user_prompt,
+        config=types.GenerateContentConfig(max_output_tokens=1024, temperature=0.2),
+    )
+    text = getattr(response, "text", None)
+    if text:
+        return str(text).strip()
+    raise RuntimeError("Gemini returned no text; check quotas, IAM, or model availability.")
+
+
 def caption_document_image(
     settings: Settings,
     *,

@@ -1,6 +1,7 @@
 """Application settings loaded from environment (never Gemini API keys; use GCP ADC)."""
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -24,9 +25,30 @@ class Settings(BaseSettings):
         default="gemini-2.0-flash",
         validation_alias=AliasChoices("VERTEX_GENERATIVE_MODEL"),
     )
+    vertex_embedding_model: str = Field(
+        default="text-embedding-004",
+        validation_alias=AliasChoices("VERTEX_EMBEDDING_MODEL"),
+    )
 
     qdrant_url: str = "http://localhost:6333"
     faiss_store_path: str = "./data/faiss"
+    rag_qdrant_collection: str = Field(
+        default="ifc_annual_report_chunks",
+        validation_alias=AliasChoices("RAG_QDRANT_COLLECTION"),
+    )
+    ifc_annual_report_pdf_path: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("IFC_ANNUAL_REPORT_PDF_PATH"),
+    )
+    rag_chunk_size: int = Field(
+        default=1200,
+        ge=200,
+        validation_alias=AliasChoices("RAG_CHUNK_SIZE"),
+    )
+    rag_chunk_overlap: int = Field(
+        default=200, ge=0, validation_alias=AliasChoices("RAG_CHUNK_OVERLAP")
+    )
+    rag_top_k: int = Field(default=5, ge=1, le=50, validation_alias=AliasChoices("RAG_TOP_K"))
 
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
@@ -40,3 +62,11 @@ def get_settings() -> Settings:
 
 def clear_settings_cache() -> None:
     get_settings.cache_clear()
+
+
+def bundled_ifc_annual_report_pdf_path() -> str | None:
+    """Resolved path to the tracked IFC sample PDF at the repository root, if present."""
+
+    root = Path(__file__).resolve().parents[2]
+    candidate = root / "ifc-annual-report-2024-financials.pdf"
+    return str(candidate) if candidate.is_file() else None
