@@ -24,9 +24,40 @@ class Settings(BaseSettings):
         default="gemini-2.0-flash",
         validation_alias=AliasChoices("VERTEX_GENERATIVE_MODEL"),
     )
+    vertex_embedding_model: str = Field(
+        default="text-embedding-004",
+        validation_alias=AliasChoices("VERTEX_EMBEDDING_MODEL"),
+    )
 
     qdrant_url: str = "http://localhost:6333"
     faiss_store_path: str = "./data/faiss"
+    rag_qdrant_collection: str = Field(
+        default="ifc_annual_report_chunks",
+        validation_alias=AliasChoices("RAG_QDRANT_COLLECTION"),
+    )
+    rag_chunk_size: int = Field(
+        default=1200,
+        ge=200,
+        validation_alias=AliasChoices("RAG_CHUNK_SIZE"),
+    )
+    rag_chunk_overlap: int = Field(
+        default=200, ge=0, validation_alias=AliasChoices("RAG_CHUNK_OVERLAP")
+    )
+    rag_top_k: int = Field(default=5, ge=1, le=50, validation_alias=AliasChoices("RAG_TOP_K"))
+    rag_embedding_batch_size: int = Field(
+        default=250,
+        ge=1,
+        le=250,
+        validation_alias=AliasChoices("RAG_EMBEDDING_BATCH_SIZE"),
+        description="Vertex embedding predict limit is 250 texts per request.",
+    )
+    rag_embedding_max_input_tokens: int = Field(
+        default=18_000,
+        ge=1024,
+        le=20_000,
+        validation_alias=AliasChoices("RAG_EMBEDDING_MAX_INPUT_TOKENS"),
+        description="Vertex caps total input tokens per embed request (sum over batch).",
+    )
 
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
