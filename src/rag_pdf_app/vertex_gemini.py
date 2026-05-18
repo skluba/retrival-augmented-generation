@@ -38,6 +38,21 @@ def format_untrusted_table_export(blob: str, *, max_chars: int = 12000) -> str:
     return f"<<<UNTRUSTED_PDF_TABLE_EXPORT>>>\n{body}\n<<<END_UNTRUSTED_PDF_TABLE_EXPORT>>>"
 
 
+def format_untrusted_eval_dataset_field(label: str, text: str, *, max_chars: int) -> str:
+    """Wrap evaluation CSV / pipeline strings for judge prompts (prompt-injection mitigation).
+
+    Content may contain adversarial instructions; models must treat delimited regions as data only.
+    """
+
+    safe_label = re.sub(r"[^\w\-]+", "_", label)[:64] or "field"
+    body = clip_untrusted_pdf_text(text, max_chars=max_chars)
+    return (
+        f"<<<UNTRUSTED_EVAL_DATA field={safe_label}>>>\n"
+        f"{body}\n"
+        f"<<<END_UNTRUSTED_EVAL_DATA field={safe_label}>>>"
+    )
+
+
 def client_for(settings: Settings) -> genai.Client:
     """Create a ``google-genai`` client routed through Vertex AI (no API keys)."""
     return genai.Client(
