@@ -88,6 +88,14 @@ else:
         st.subheader("Structured PDF parsing")
 
         run_docling = st.checkbox("Run Docling (slower, richer structure)", value=False)
+        run_camelot = st.checkbox(
+            "Camelot lattice/stream tables (Ghostscript — trusted PDFs only)",
+            value=False,
+            help=(
+                "Camelot shells out to Ghostscript on a tempfile. Disable for untrusted uploads "
+                "because native parsers have historically had memory-safety issues."
+            ),
+        )
         gemini_caps = st.checkbox(
             "Gemini captions for raster images (multimodal quota)", value=True
         )
@@ -117,6 +125,7 @@ else:
                     gemini_image_captions=gemini_caps,
                     gemini_table_summaries=gemini_tbl,
                     run_docling=run_docling,
+                    run_camelot=run_camelot,
                 )
             st.session_state["last_parsed_pdf"] = parsed
 

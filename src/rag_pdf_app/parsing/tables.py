@@ -67,6 +67,8 @@ def _dataframe_to_cells(df: pd.DataFrame) -> list[list[CellValue]]:
 
 
 def _camelot_read_all_pages(pdf_path: str, flavor: str) -> Any:
+    """Invoke Camelot (Ghostscript subprocess). Call only when ``run_camelot`` is enabled."""
+
     import camelot  # type: ignore[import-untyped]
 
     with warnings.catch_warnings():

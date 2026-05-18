@@ -2,6 +2,8 @@ FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
+# Ghostscript supports Camelot (`parse_pdf_bytes(..., run_camelot=True)`). Parsing skips Camelot
+# by default so production deployments that never enable it could omit this package.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ghostscript \

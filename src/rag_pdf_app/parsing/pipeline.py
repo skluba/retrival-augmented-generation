@@ -221,7 +221,14 @@ def parse_pdf_bytes(
     gemini_image_captions: bool = True,
     gemini_table_summaries: bool = True,
     run_docling: bool = True,
+    run_camelot: bool = False,
 ) -> ParsedPdf:
+    """Parse ``data`` into a structured :class:`ParsedPdf`.
+
+    ``run_camelot`` defaults to false because Camelot invokes Ghostscript on the PDF path,
+    which is hazardous for untrusted uploads (native attack surface). PyMuPDF table detection
+    still runs when Camelot is off.
+    """
     notes: list[str] = []
     sha_hex = hashlib.sha256(data).hexdigest()
 
@@ -247,7 +254,14 @@ def parse_pdf_bytes(
     layout_spines = sorted_text_spans_for_layout([sp for sp in text_spans if sp.bbox is not None])
     spans_by_id = {sp.span_id: sp for sp in layout_spines}
 
-    camelot_blocks = _camelot_tables_via_tempfile(data, notes)
+    camelot_blocks: list[TableBlock] = []
+    if run_camelot:
+        camelot_blocks = _camelot_tables_via_tempfile(data, notes)
+    else:
+        notes.append(
+            "camelot_skipped: Camelot/Ghostscript table extraction disabled "
+            "(enable run_camelot only for trusted PDFs)."
+        )
     pym_tables = extract_tables_pymupdf(data, notes)
     tables_final = [*camelot_blocks, *pym_tables]
 
