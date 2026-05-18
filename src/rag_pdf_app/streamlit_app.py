@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import base64
 import json
+import base64
+import json
 import os
+from typing import Any
 from typing import Any
 
 import streamlit as st
@@ -13,6 +16,25 @@ from rag_pdf_app.config import Settings, clear_settings_cache, get_settings
 
 st.set_page_config(page_title="PDF RAG Lab", layout="wide")
 st.title("PDF RAG workspace")
+st.caption("Gemini · Vertex AI · PyMuPDF · pdfminer · pypdf · Docling · Camelot")
+
+
+def _scrub_b64_for_json(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        cleaned: dict[str, Any] = {}
+        for k, v in obj.items():
+            if k == "image_bytes_b64" and isinstance(v, str) and len(v) > 64:
+                cleaned[k] = f"<<base64 omitted, {len(v)} chars>>"
+            else:
+                cleaned[k] = _scrub_b64_for_json(v)
+        return cleaned
+    if isinstance(obj, list):
+        return [_scrub_b64_for_json(item) for item in obj]
+    return obj
+
+
+sidebar = st.sidebar
+with sidebar:
 st.caption("Gemini · Vertex AI · PyMuPDF · pdfminer · pypdf · Docling · Camelot")
 
 
@@ -74,7 +96,14 @@ else:
 
         if st.checkbox("Smoke test Gemini (calls Vertex AI)"):
             from rag_pdf_app.vertex_gemini import generate_plain_text
+        if st.checkbox("Smoke test Gemini (calls Vertex AI)"):
+            from rag_pdf_app.vertex_gemini import generate_plain_text
 
+            prompt = st.text_area("Prompt", value="Respond with exactly: pong")
+            if st.button("Run Gemini text"):
+                with st.spinner("Calling Gemini…"):
+                    out = generate_plain_text(prompt, settings_obj)
+                st.write(out)
             prompt = st.text_area("Prompt", value="Respond with exactly: pong")
             if st.button("Run Gemini text"):
                 with st.spinner("Calling Gemini…"):
@@ -101,25 +130,20 @@ else:
             help="Text is extracted with pypdf, pdfminer layout, and optionally Docling.",
         )
 
-        parse_clicked = st.button(
-            "Parse PDF",
-            type="primary",
-            disabled=(pdf_file is None),
-            help="Choose a PDF file first." if pdf_file is None else None,
-        )
-        if pdf_file is not None and parse_clicked:
-            raw = pdf_file.getvalue()
-            with st.spinner("Running extractors (this can take a while)…"):
-                parsed = parse_pdf_bytes(
-                    raw,
-                    pdf_file.name,
-                    settings=settings_obj,
-                    embed_image_base64=embed_b64,
-                    gemini_image_captions=gemini_caps,
-                    gemini_table_summaries=gemini_tbl,
-                    run_docling=run_docling,
-                )
-            st.session_state["last_parsed_pdf"] = parsed
+        if pdf_file:
+            if st.button("Parse PDF", type="primary"):
+                raw = pdf_file.getvalue()
+                with st.spinner("Running extractors (this can take a while)…"):
+                    parsed = parse_pdf_bytes(
+                        raw,
+                        pdf_file.name,
+                        settings=settings_obj,
+                        embed_image_base64=embed_b64,
+                        gemini_image_captions=gemini_caps,
+                        gemini_table_summaries=gemini_tbl,
+                        run_docling=run_docling,
+                    )
+                st.session_state["last_parsed_pdf"] = parsed
 
         parsed_state = st.session_state.get("last_parsed_pdf")
         if parsed_state is not None:

@@ -281,3 +281,185 @@ def parse_pdf_bytes(
         tables=tables_final,
         parsing_notes=notes,
     )
+"""End-to-end PDF parsing: metadata, structured text, images, tables, Gemini enrichments."""
+
+from __future__ import annotations
+
+import base64
+import contextlib
+import hashlib
+import io
+import os
+import tempfile
+
+from rag_pdf_app.config import Settings
+from rag_pdf_app.parsing.images import extract_images_pymupdf
+from rag_pdf_app.parsing.models import ParsedPdf, TableBlock, TextSpan
+from rag_pdf_app.parsing.relations import (
+    nearest_neighbors,
+    snippets_for_neighbor_ids,
+    sorted_text_spans_for_layout,
+)
+from rag_pdf_app.parsing.tables import extract_tables_camelot, extract_tables_pymupdf
+from rag_pdf_app.parsing.text_extractors import (
+    extract_docling_markdown,
+    extract_pdfminer_text_spans,
+    extract_pypdf_metadata_and_plaintext,
+)
+from rag_pdf_app.vertex_gemini import caption_document_image, summarize_table_for_rag
+
+
+def parse_pdf_bytes(
+    data: bytes,
+    filename: str,
+    *,
+    settings: Settings,
+    embed_image_base64: bool = True,
+    gemini_image_captions: bool = True,
+    gemini_table_summaries: bool = True,
+    run_docling: bool = True,
+) -> ParsedPdf:
+    notes: list[str] = []
+    sha_hex = hashlib.sha256(data).hexdigest()
+
+    bio = io.BytesIO(data)
+    file_meta, per_page = extract_pypdf_metadata_and_plaintext(bio)
+
+    bio.seek(0)
+    miner_spans = extract_pdfminer_text_spans(bio)
+
+    doc_md: str | None = None
+    if run_docling:
+        bio.seek(0)
+        doc_md, doc_err = extract_docling_markdown(bio)
+        if doc_err:
+            notes.append(doc_err)
+
+    text_spans: list[TextSpan] = []
+    for page_idx, text in sorted(per_page.items()):
+        stripped = text.strip()
+        if not stripped:
+            continue
+        text_spans.append(
+            TextSpan(
+                span_id=f"pypdf-page-{page_idx}",
+                page_index=page_idx,
+                bbox=None,
+                text=stripped,
+                extractor="pypdf_page",
+                metadata={"engine": "pypdf.Page.extract_text"},
+            )
+        )
+
+    text_spans.extend(miner_spans)
+
+    if doc_md and doc_md.strip():
+        text_spans.append(
+            TextSpan(
+                span_id="docling-markdown-document",
+                page_index=0,
+                bbox=None,
+                text=doc_md.strip(),
+                extractor="docling_markdown",
+                metadata={"source": "docling.export_to_markdown"},
+            )
+        )
+
+    layout_spines = sorted_text_spans_for_layout([s for s in text_spans if s.bbox is not None])
+    spans_by_id = {sp.span_id: sp for sp in layout_spines}
+
+    tmp_pdf: str | None = None
+    camelot_blocks: list[TableBlock] = []
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tf:
+            tf.write(data)
+            tf.flush()
+            tmp_pdf = tf.name
+        camelot_blocks = extract_tables_camelot(tmp_pdf, notes)
+    except Exception as exc:  # noqa: BLE001 — temp file paths / ghostscript quirks
+        notes.append(f"camelot_path_error:{exc}")
+    finally:
+        if tmp_pdf:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_pdf)
+
+    pym_tables = extract_tables_pymupdf(data, notes)
+    tables_final = [*camelot_blocks, *pym_tables]
+
+    for tbl in tables_final:
+        if tbl.bbox is not None:
+            page_idx_tbl = tbl.bbox.page_index
+            spans_same_page = [
+                sp
+                for sp in layout_spines
+                if sp.bbox is not None and sp.bbox.page_index == page_idx_tbl
+            ]
+            aid, bid = nearest_neighbors(tbl.bbox, spans_on_page=spans_same_page)
+        else:
+            same_page = [
+                sp
+                for sp in layout_spines
+                if sp.page_index == tbl.page_index and sp.bbox is not None
+            ]
+            aid = same_page[0].span_id if same_page else None
+            bid = same_page[-1].span_id if len(same_page) > 1 else None
+
+        snippets = snippets_for_neighbor_ids(aid, bid, spans_by_id=spans_by_id)
+        tbl.related_text_above_span_id = aid
+        tbl.related_text_below_span_id = bid
+        tbl.metadata["contextual_snippet_above"] = snippets[0]
+        tbl.metadata["contextual_snippet_below"] = snippets[1]
+
+        if gemini_table_summaries and (tbl.as_markdown or tbl.as_csv):
+            try:
+                summary = summarize_table_for_rag(settings, tbl.as_markdown, tbl.as_csv)
+                if summary.strip():
+                    tbl.summary = summary.strip()
+                    tbl.summary_model = settings.vertex_generative_model
+            except Exception as exc:  # noqa: BLE001 — Vertex quotas / OCR noise
+                notes.append(f"gemini_table_summary_{tbl.table_id}:{exc}")
+
+    images_blocks = extract_images_pymupdf(data, embed_base64=embed_image_base64)
+
+    for img in images_blocks:
+        page_idx_img = img.bbox.page_index
+        spans_same_page = [
+            sp for sp in layout_spines if sp.bbox is not None and sp.bbox.page_index == page_idx_img
+        ]
+        aid, bid = nearest_neighbors(img.bbox, spans_on_page=spans_same_page)
+        snippets = snippets_for_neighbor_ids(aid, bid, spans_by_id=spans_by_id)
+        img.related_text_above_span_id = aid
+        img.related_text_below_span_id = bid
+        img.contextual_snippet_above = snippets[0]
+        img.contextual_snippet_below = snippets[1]
+
+        if gemini_image_captions and img.image_bytes_b64:
+            try:
+                blob = base64.b64decode(img.image_bytes_b64)
+            except Exception as exc:  # noqa: BLE001
+                notes.append(f"img_decode_xref_{img.xref}:{exc}")
+                continue
+            mime = img.mime_type or "image/png"
+            try:
+                img.caption = caption_document_image(
+                    settings,
+                    image_bytes=blob,
+                    mime_type=mime,
+                    neighbour_above=snippets[0],
+                    neighbour_below=snippets[1],
+                )
+                img.caption_model = settings.vertex_generative_model
+            except Exception as exc:  # noqa: BLE001
+                notes.append(f"gemini_img_caption_xref_{img.xref}:{exc}")
+
+    return ParsedPdf(
+        filename=filename,
+        pdf_bytes_sha256=sha_hex,
+        file_level_metadata=file_meta,
+        pypdf_per_page_plaintext=per_page,
+        text_spans=text_spans,
+        docling_markdown=doc_md,
+        images=images_blocks,
+        tables=tables_final,
+        parsing_notes=notes,
+    )
