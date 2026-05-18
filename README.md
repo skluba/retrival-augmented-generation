@@ -101,7 +101,27 @@ uv run pytest --maxfail=1 --disable-warnings
 uv run streamlit run src/rag_pdf_app/streamlit_app.py
 ```
 
-Gemini invocation uses **`google-genai`** with **`vertexai=True`** (wired in `rag_pdf_app/vertex_gemini.py`).
+### Phase 2 · RAG evaluation (RAGAS + LLM judge)
+
+After **Phase 1** ingestion built `FAISS_STORE_PATH` and populated Qdrant, evaluate retrieval + generation against the labeled workbook at the repository root: `RAG_evaluation_dataset - convertcsv.csv` (commit that file for shared runs). **`tests/fixtures/ifc_eval_sample.csv`** exercises the loader in CI when the full CSV is absent.
+
+The CLI runs the same Phase 1 pipeline as Streamlit (dual retrieval → Gemini answer), scores outputs with **RAGAS** (faithfulness, answer relevancy, context precision vs reference answer, context recall), then applies an optional **Gemini judge** rubric on rows whose `Context_Content_Type` suggests tables, figures, or composite evidence.
+
+```bash
+# Full suite (Vertex ADC required; Qdrant reachable at QDRANT_URL)
+uv run rag-pdf-eval
+
+# Smoke subset + custom output path
+uv run rag-pdf-eval --max-rows 3 --output-json ./reports/eval/smoke.json
+
+# Skip judge; judge every row instead of heuristics-only
+uv run rag-pdf-eval --skip-judge
+uv run rag-pdf-eval --judge-all
+```
+
+Reports default to `reports/eval/phase2_rag_eval_<utc-timestamp>.json` (overall means, per-row scores, means stratified by `Context_Content_Type`, judge outputs).
+
+Run this **after each pipeline phase** you care about (e.g. after re-ingesting with new chunking or embedding settings) so regressions show up in the JSON deltas.
 
 ---
 

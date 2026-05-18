@@ -47,13 +47,15 @@ def client_for(settings: Settings) -> genai.Client:
     )
 
 
-def generate_plain_text(prompt: str, settings: Settings) -> str:
+def generate_plain_text(prompt: str, settings: Settings, *, max_output_tokens: int = 512) -> str:
     """Minimal text generation helper for scaffolding and smoke checks."""
     client = client_for(settings)
     response = client.models.generate_content(
         model=settings.vertex_generative_model,
         contents=prompt,
-        config=types.GenerateContentConfig(max_output_tokens=512, temperature=0.2),
+        config=types.GenerateContentConfig(
+            max_output_tokens=max_output_tokens, temperature=0.2
+        ),
     )
     text = getattr(response, "text", None)
     if text:
