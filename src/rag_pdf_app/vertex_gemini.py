@@ -53,9 +53,7 @@ def generate_plain_text(prompt: str, settings: Settings, *, max_output_tokens: i
     response = client.models.generate_content(
         model=settings.vertex_generative_model,
         contents=prompt,
-        config=types.GenerateContentConfig(
-            max_output_tokens=max_output_tokens, temperature=0.2
-        ),
+        config=types.GenerateContentConfig(max_output_tokens=max_output_tokens, temperature=0.2),
     )
     text = getattr(response, "text", None)
     if text:

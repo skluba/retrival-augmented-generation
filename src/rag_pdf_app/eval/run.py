@@ -90,8 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     ragas_samples = pipeline_rows_to_ragas_samples(pipeline_rows)
 
     print(
-        "Running RAGAS (faithfulness, answer_relevancy, context_precision, "
-        "context_recall)…",
+        "Running RAGAS (faithfulness, answer_relevancy, context_precision, context_recall)…",
         flush=True,
     )
     with warnings.catch_warnings():
@@ -156,8 +155,7 @@ def main(argv: list[str] | None = None) -> int:
 
     metric_keys = list(ragas_result.scores[0].keys()) if ragas_result.scores else []
     ragas_summary_mean = {
-        k: float(safe_nanmean([row[k] for row in ragas_result.scores]))
-        for k in metric_keys
+        k: float(safe_nanmean([row[k] for row in ragas_result.scores])) for k in metric_keys
     }
 
     payload: dict[str, object] = {
