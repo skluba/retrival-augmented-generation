@@ -15,4 +15,6 @@ def test_settings_direct_instantiation() -> None:
     settings = Settings()
     assert settings.vertex_generative_model
     assert settings.vertex_embedding_model
+    assert settings.rag_embedding_batch_size == 250
+    assert settings.rag_embedding_max_input_tokens == 18_000
     assert settings.qdrant_url.startswith("http")

@@ -13,15 +13,28 @@ from typing import Any, cast
 
 import fitz  # PyMuPDF
 import pandas as pd
+from pandas.io.common import dedup_names
 
 from rag_pdf_app.parsing.models import BBox, TableBlock
 
 type ExportBundle = tuple[str | None, str | None, str | None, list[dict[str, Any]] | None]
 
 
+def _dedupe_column_names(df: pd.DataFrame) -> pd.DataFrame:
+    """Unique labels for ``orient='records'`` JSON; PDF headers often repeat."""
+
+    if df.empty or df.columns.empty:
+        return df
+    out = df.copy()
+    labels = ["" if c is None else str(c) for c in out.columns]
+    out.columns = dedup_names(labels, is_potential_multiindex=False)
+    return out
+
+
 def _dataframe_to_exports(df: pd.DataFrame) -> ExportBundle:
     if df.empty:
         return None, None, None, None
+    df = _dedupe_column_names(df)
     csv_s = df.to_csv(index=False)
     html_s = df.to_html(index=False)
     md_s: str | None = None

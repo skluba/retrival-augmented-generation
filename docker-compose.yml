@@ -17,16 +17,24 @@ services:
       GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION:-us-central1}
       GOOGLE_GENAI_USE_VERTEXAI: ${GOOGLE_GENAI_USE_VERTEXAI:-true}
       VERTEX_GENERATIVE_MODEL: ${VERTEX_GENERATIVE_MODEL:-gemini-2.0-flash}
+      # ADC JSON mounted below (`gcloud auth application-default login` on the host). Override for a SA JSON path if needed.
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-/secrets/application_default_credentials.json}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse-web:3000}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      # Do not use `${QDRANT_URL}` here — `.env` usually sets localhost for host-native Streamlit, which
+      # breaks inside this container. This value is injected as the app's QDRANT_URL (see QDRANT_DOCKER_URL).
+      QDRANT_URL: ${QDRANT_DOCKER_URL:-http://qdrant:6333}
       FAISS_STORE_PATH: /app/data/faiss
     ports:
       - "8501:8501"
     volumes:
       - rag_data:/app/data
-      # Uncomment to inject a service-account JSON mount for unattended CI-style runs:
+      # Vertex / google-genai need credentials inside the container. Host ADC after:
+      #   gcloud auth application-default login
+      # Override GCP_ADC_HOST_PATH in `.env` if your JSON lives elsewhere (or use a SA JSON mount instead).
+      - ${GCP_ADC_HOST_PATH:-${HOME}/.config/gcloud/application_default_credentials.json}:/secrets/application_default_credentials.json:ro
+      # Alternative (service account): set GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-sa.json and mount:
       # - ./secrets/gcp-sa.json:/secrets/gcp-sa.json:ro
     depends_on:
       qdrant:

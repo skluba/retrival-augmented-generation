@@ -8,6 +8,7 @@ import os
 from typing import Any
 
 import streamlit as st
+from google.auth.exceptions import DefaultCredentialsError
 
 from rag_pdf_app.config import (
     Settings,
@@ -40,7 +41,9 @@ with st.sidebar:
     st.code(
         (
             "Use GCP Application Default Credentials — no Gemini API keys.\n"
-            "Example: `gcloud auth application-default login`"
+            "Host: `gcloud auth application-default login`\n"
+            "Docker Compose: mount host ADC (see docker-compose `GCP_ADC_HOST_PATH`) "
+            "and GOOGLE_APPLICATION_CREDENTIALS, or mount a service-account JSON."
         ),
         language="text",
     )
@@ -87,8 +90,19 @@ else:
             prompt = st.text_area("Prompt", value="Respond with exactly: pong")
             if st.button("Run Gemini text"):
                 with st.spinner("Calling Gemini…"):
-                    out = generate_plain_text(prompt, settings_obj)
-                st.write(out)
+                    try:
+                        out = generate_plain_text(prompt, settings_obj)
+                    except DefaultCredentialsError as cred_exc:
+                        st.error(
+                            "Google credentials are not available **inside this process**. "
+                            "On the host, run `gcloud auth application-default login`. "
+                            "In **Docker**, mount that JSON and set "
+                            "`GOOGLE_APPLICATION_CREDENTIALS` "
+                            "(see `docker-compose.yml` for `GCP_ADC_HOST_PATH`)."
+                        )
+                        st.exception(cred_exc)
+                    else:
+                        st.write(out)
 
         st.markdown(
             "Phase 1 RAG lives in the **Phase 1 · IFC RAG** tab (ingest, dual retrieval, Gemini)."

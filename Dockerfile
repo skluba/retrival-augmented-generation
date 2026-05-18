@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
  && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml uv.lock README.md /app/
 COPY ifc-annual-report-2024-financials.pdf /app/
+COPY pyproject.toml uv.lock README.md /app/
 # `tool.uv.sources` points antlr4-python3-runtime + pylatexenc at vendored wheels (`uv sync --no-build`).
 COPY third_party/wheels /app/third_party/wheels
 COPY src /app/src
@@ -23,7 +23,7 @@ COPY src /app/src
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
-RUN uv sync --frozen --no-build --python 3.12
+RUN uv sync --frozen --python 3.12
 
 ENV PATH="/app/.venv/bin:$PATH" \
     VIRTUAL_ENV="/app/.venv" \

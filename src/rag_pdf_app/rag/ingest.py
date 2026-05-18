@@ -10,7 +10,7 @@ from langchain_community.vectorstores import FAISS
 
 from rag_pdf_app.config import Settings
 from rag_pdf_app.rag.chunking import build_chunks_from_pdf_bytes, chunks_to_langchain_payload
-from rag_pdf_app.rag.embeddings import vertex_text_embeddings
+from rag_pdf_app.rag.embeddings import vertex_embed_documents_batched, vertex_text_embeddings
 from rag_pdf_app.rag.stores import (
     qdrant_client,
     reset_qdrant_collection,
@@ -53,12 +53,21 @@ def ingest_pdf_bytes_to_indexes(
 
     texts, metadatas = chunks_to_langchain_payload(chunks)
     embedder = vertex_text_embeddings(settings)
-    vectors = embedder.embed_documents(texts)
+    vectors = vertex_embed_documents_batched(
+        embedder,
+        texts,
+        batch_size=settings.rag_embedding_batch_size,
+        max_input_tokens_per_request=settings.rag_embedding_max_input_tokens,
+    )
     if not vectors:
         raise RuntimeError("Embedding provider returned no vectors.")
     dim = len(vectors[0])
 
-    store = FAISS.from_texts(texts, embedder, metadatas=metadatas)
+    store = FAISS.from_embeddings(
+        list(zip(texts, vectors, strict=True)),
+        embedder,
+        metadatas=metadatas,
+    )
     out_dir = save_faiss_index(store, settings)
 
     client = qdrant_client(settings)
