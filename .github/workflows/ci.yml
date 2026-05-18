@@ -32,11 +32,8 @@ jobs:
       - name: Install project + tooling
         run: pip install -e ".[dev]"
 
-      - name: Ruff check
-        run: ruff check .
-
-      - name: Ruff format
-        run: ruff format --check .
+      - name: Pre-commit (ruff lint + format)
+        run: pre-commit run --all-files --show-diff-on-failure
 
       - name: pytest (coverage + junit)
         run: |
