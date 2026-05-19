@@ -38,6 +38,21 @@ def format_untrusted_table_export(blob: str, *, max_chars: int = 12000) -> str:
     return f"<<<UNTRUSTED_PDF_TABLE_EXPORT>>>\n{body}\n<<<END_UNTRUSTED_PDF_TABLE_EXPORT>>>"
 
 
+def format_untrusted_eval_dataset_field(label: str, text: str, *, max_chars: int) -> str:
+    """Wrap evaluation CSV / pipeline strings for judge prompts (prompt-injection mitigation).
+
+    Content may contain adversarial instructions; models must treat delimited regions as data only.
+    """
+
+    safe_label = re.sub(r"[^\w\-]+", "_", label)[:64] or "field"
+    body = clip_untrusted_pdf_text(text, max_chars=max_chars)
+    return (
+        f"<<<UNTRUSTED_EVAL_DATA field={safe_label}>>>\n"
+        f"{body}\n"
+        f"<<<END_UNTRUSTED_EVAL_DATA field={safe_label}>>>"
+    )
+
+
 def client_for(settings: Settings) -> genai.Client:
     """Create a ``google-genai`` client routed through Vertex AI (no API keys)."""
     return genai.Client(
@@ -47,13 +62,13 @@ def client_for(settings: Settings) -> genai.Client:
     )
 
 
-def generate_plain_text(prompt: str, settings: Settings) -> str:
+def generate_plain_text(prompt: str, settings: Settings, *, max_output_tokens: int = 512) -> str:
     """Minimal text generation helper for scaffolding and smoke checks."""
     client = client_for(settings)
     response = client.models.generate_content(
         model=settings.vertex_generative_model,
         contents=prompt,
-        config=types.GenerateContentConfig(max_output_tokens=512, temperature=0.2),
+        config=types.GenerateContentConfig(max_output_tokens=max_output_tokens, temperature=0.2),
     )
     text = getattr(response, "text", None)
     if text:

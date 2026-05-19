@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 COPY ifc-annual-report-2024-financials.pdf /app/
+COPY RAG_evaluation_dataset-convertcsv.csv /app/
 COPY pyproject.toml uv.lock README.md /app/
 # `tool.uv.sources` points antlr4-python3-runtime + pylatexenc at vendored wheels so `--no-build`
 # can satisfy the lockfile. The workspace root has no wheel — install it in a second step.

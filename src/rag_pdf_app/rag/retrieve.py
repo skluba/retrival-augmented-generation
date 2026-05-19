@@ -34,6 +34,12 @@ class DualRetrievalResult:
     notes: list[str] = field(default_factory=list)
 
 
+def faiss_retrieved_chunk_texts(dual: DualRetrievalResult) -> list[str]:
+    """Texts from FAISS hits in retrieval order (matches Phase 1 context ordering)."""
+
+    return [h.text for h in dual.faiss_hits]
+
+
 def _faiss_hits(store: FAISS, query: str, k: int) -> tuple[list[RetrievalHit], float]:
     t0 = time.perf_counter()
     pairs = store.similarity_search_with_score(query, k=k)
