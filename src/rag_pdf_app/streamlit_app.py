@@ -227,6 +227,9 @@ else:
             "**Provide the PDF via upload** (normal flow). Ingest runs once (Vertex embeddings → "
             "**FAISS** on disk + **Qdrant**). Each question retrieves on **both** backends for "
             "latency/score comparison; Gemini answers use **FAISS** hits."
+            "\n\n**Phase 4 (optional, `.env`):** `RAG_SEMANTIC_CACHE_ENABLED` reuses answers for "
+            "similar questions (skipped when using page-window filters). "
+            "`RAG_MULTI_HOP_ENABLED` runs a second retrieval pass after an LLM-suggested query."
         )
 
         upload_rag = st.file_uploader(
@@ -303,6 +306,15 @@ else:
                     else:
                         st.markdown("### Answer")
                         st.write(result.answer)
+                        if result.semantic_cache_hit:
+                            st.success(
+                                "Semantic cache hit — similar prior query (see retrieval notes)."
+                            )
+                            if result.semantic_cache_similarity is not None:
+                                sim = result.semantic_cache_similarity
+                                st.caption(f"Cache cosine similarity ≈ **{sim:.3f}**")
+                        if result.multi_hop_used:
+                            st.info("Multi-hop retrieval merged a second FAISS pass into context.")
                         st.caption(
                             f"Langfuse trace: **{'yes' if result.langfuse_traced else 'no'}** "
                             "(needs `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`)."

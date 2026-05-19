@@ -10,6 +10,8 @@ Committed summaries for **Phase 2** (`rag-pdf-eval`) live here when you want Git
 
 Each report now embeds a **`retrieval_config`** block (JSON and Markdown) plus per-row **`dual_retrieval_notes`** and **`rag_hybrid_enabled`**. Use that to prove runs were configured as intended. **`faiss_store_basename`** is the directory leaf name only so shared reports do not expose absolute paths; set **`RAG_EVAL_SNAPSHOT_INCLUDE_ABSOLUTE_PATHS=true`** only for private debugging.
 
+Keep **`RAG_SEMANTIC_CACHE_ENABLED=false`** for standard labeled runs so similarity-cache hits do not shortcut retrieval during RAGAS.
+
 ### Tuning hybrid toward higher context recall
 
 RAGAS **context_recall** is usually the first metric to react when retrieval misses gold passages.

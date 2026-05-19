@@ -14,8 +14,10 @@ from langchain_community.vectorstores import FAISS
 
 from rag_pdf_app.config import Settings
 from rag_pdf_app.rag.embeddings import vertex_text_embeddings
+from rag_pdf_app.rag.multi_hop import retrieve_dual_with_multi_hop
 from rag_pdf_app.rag.query_page_window import strip_inline_page_window
-from rag_pdf_app.rag.retrieve import DualRetrievalResult, RetrievalHit, retrieve_dual
+from rag_pdf_app.rag.retrieve import BackendTiming, DualRetrievalResult, RetrievalHit
+from rag_pdf_app.rag.semantic_cache import get_semantic_cache
 from rag_pdf_app.rag.stores import qdrant_client
 from rag_pdf_app.vertex_gemini import generate_rag_answer
 
@@ -26,6 +28,9 @@ class Phase1RagResult:
     prompt: str
     retrieval: DualRetrievalResult
     langfuse_traced: bool = False
+    semantic_cache_hit: bool = False
+    semantic_cache_similarity: float | None = None
+    multi_hop_used: bool = False
 
 
 def _optional_langfuse(settings: Settings):
@@ -45,6 +50,36 @@ def _langfuse_safe_query_metrics(query: str) -> dict[str, str | int]:
         "query_char_length": len(query),
         "query_sha256": digest,
     }
+
+
+def _semantic_cache_eligible(settings: Settings, inline_pages: tuple[int, int] | None) -> bool:
+    """Semantic cache is unsafe when page scopes narrow retrieval."""
+
+    if inline_pages is not None:
+        return False
+    if settings.rag_page_filter_min is not None or settings.rag_page_filter_max is not None:
+        return False
+    return True
+
+
+def _maybe_store_semantic_cache(
+    settings: Settings,
+    *,
+    inline_pages: tuple[int, int] | None,
+    query_embedding: list[float] | None,
+    answer: str,
+) -> None:
+    if (
+        not settings.rag_semantic_cache_enabled
+        or query_embedding is None
+        or not _semantic_cache_eligible(settings, inline_pages)
+    ):
+        return
+    get_semantic_cache(settings.rag_semantic_cache_path).put(
+        query_embedding,
+        answer,
+        max_entries=settings.rag_semantic_cache_max_entries,
+    )
 
 
 def _format_context_block(hits: list[RetrievalHit], *, max_chars: int = 12000) -> str:
@@ -94,34 +129,100 @@ def run_phase1_rag(
 
     retrieval_query, inline_pages = strip_inline_page_window(query)
 
+    query_embedding_for_cache: list[float] | None = None
+    if settings.rag_semantic_cache_enabled and _semantic_cache_eligible(settings, inline_pages):
+        query_embedding_for_cache = embedder.embed_query(retrieval_query)
+        hit = get_semantic_cache(settings.rag_semantic_cache_path).lookup_best(
+            query_embedding_for_cache,
+            similarity_threshold=settings.rag_semantic_cache_similarity_threshold,
+        )
+        if hit is not None:
+            answer, sim = hit
+            dual = DualRetrievalResult(
+                faiss_hits=[],
+                qdrant_hits=[],
+                faiss_timing=BackendTiming(0.0, "semantic cache hit"),
+                qdrant_timing=BackendTiming(0.0, "semantic cache hit"),
+                notes=["semantic_cache_hit", f"semantic_cache_similarity:{sim:.4f}"],
+            )
+            prompt = build_phase1_prompt(
+                query,
+                "(Answer reused from semantic cache; passages omitted.)",
+            )
+            trace_meta = {
+                "retrieval_backends": ["faiss", "qdrant"],
+                "rag_hybrid_enabled": settings.rag_hybrid_enabled,
+                "rag_semantic_cache_enabled": settings.rag_semantic_cache_enabled,
+                "rag_multi_hop_enabled": settings.rag_multi_hop_enabled,
+                "semantic_cache_hit": True,
+            }
+            if lf is not None:
+                with lf.start_as_current_observation(
+                    name="phase1_ifc_rag",
+                    input=_langfuse_safe_query_metrics(query),
+                ) as trace_obs:
+                    trace_obs.update(
+                        output={
+                            "semantic_cache_hit": True,
+                            "semantic_cache_similarity": sim,
+                        },
+                        metadata=trace_meta,
+                    )
+                lf.flush()
+                return Phase1RagResult(
+                    answer=answer,
+                    prompt=prompt,
+                    retrieval=dual,
+                    langfuse_traced=True,
+                    semantic_cache_hit=True,
+                    semantic_cache_similarity=sim,
+                    multi_hop_used=False,
+                )
+            return Phase1RagResult(
+                answer=answer,
+                prompt=prompt,
+                retrieval=dual,
+                langfuse_traced=False,
+                semantic_cache_hit=True,
+                semantic_cache_similarity=sim,
+                multi_hop_used=False,
+            )
+
     dual: DualRetrievalResult
     prompt: str
     answer: str
+    multi_hop_used: bool
+
+    trace_meta = {
+        "retrieval_backends": ["faiss", "qdrant"],
+        "rag_hybrid_enabled": settings.rag_hybrid_enabled,
+        "rag_semantic_cache_enabled": settings.rag_semantic_cache_enabled,
+        "rag_multi_hop_enabled": settings.rag_multi_hop_enabled,
+    }
 
     if lf is not None:
         with lf.start_as_current_observation(
             name="phase1_ifc_rag",
             input=_langfuse_safe_query_metrics(query),
         ) as trace_obs:
-            dual = retrieve_dual(
-                query=retrieval_query,
+            dual, multi_hop_used = retrieve_dual_with_multi_hop(
+                settings=settings,
                 embeddings=embedder,
                 faiss_store=faiss_store,
                 qdrant=qdr,
+                retrieval_query=retrieval_query,
                 collection=settings.rag_qdrant_collection,
                 top_k=settings.rag_top_k,
-                settings=settings,
                 inline_page_window_1based=inline_pages,
+                original_question=query,
             )
             trace_obs.update(
                 output={
                     "faiss_latency_ms": dual.faiss_timing.latency_ms,
                     "qdrant_latency_ms": dual.qdrant_timing.latency_ms,
+                    "multi_hop_used": multi_hop_used,
                 },
-                metadata={
-                    "retrieval_backends": ["faiss", "qdrant"],
-                    "rag_hybrid_enabled": settings.rag_hybrid_enabled,
-                },
+                metadata={**trace_meta, "multi_hop_used": multi_hop_used},
             )
 
             ctx = _format_context_block(dual.faiss_hits)
@@ -137,29 +238,44 @@ def run_phase1_rag(
                 gen.update(output={"answer_chars": len(answer)})
 
         lf.flush()
+        _maybe_store_semantic_cache(
+            settings,
+            inline_pages=inline_pages,
+            query_embedding=query_embedding_for_cache,
+            answer=answer,
+        )
         return Phase1RagResult(
             answer=answer,
             prompt=prompt,
             retrieval=dual,
             langfuse_traced=True,
+            multi_hop_used=multi_hop_used,
         )
 
-    dual = retrieve_dual(
-        query=retrieval_query,
+    dual, multi_hop_used = retrieve_dual_with_multi_hop(
+        settings=settings,
         embeddings=embedder,
         faiss_store=faiss_store,
         qdrant=qdr,
+        retrieval_query=retrieval_query,
         collection=settings.rag_qdrant_collection,
         top_k=settings.rag_top_k,
-        settings=settings,
         inline_page_window_1based=inline_pages,
+        original_question=query,
     )
     ctx = _format_context_block(dual.faiss_hits)
     prompt = build_phase1_prompt(query, ctx)
     answer = generate_rag_answer(prompt, settings)
+    _maybe_store_semantic_cache(
+        settings,
+        inline_pages=inline_pages,
+        query_embedding=query_embedding_for_cache,
+        answer=answer,
+    )
     return Phase1RagResult(
         answer=answer,
         prompt=prompt,
         retrieval=dual,
         langfuse_traced=False,
+        multi_hop_used=multi_hop_used,
     )

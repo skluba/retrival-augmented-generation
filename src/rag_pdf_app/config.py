@@ -132,6 +132,35 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Phase 4 · Semantic answer cache (embedding similarity; disabled with page-window filters).
+    rag_semantic_cache_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("RAG_SEMANTIC_CACHE_ENABLED"),
+    )
+    rag_semantic_cache_path: str = Field(
+        default="./data/semantic_rag_cache.json",
+        validation_alias=AliasChoices("RAG_SEMANTIC_CACHE_PATH"),
+    )
+    rag_semantic_cache_similarity_threshold: float = Field(
+        default=0.92,
+        ge=0.5,
+        le=1.0,
+        validation_alias=AliasChoices("RAG_SEMANTIC_CACHE_SIMILARITY_THRESHOLD"),
+        description="Cosine similarity minimum vs cached query embeddings to reuse an answer.",
+    )
+    rag_semantic_cache_max_entries: int = Field(
+        default=256,
+        ge=16,
+        le=10_000,
+        validation_alias=AliasChoices("RAG_SEMANTIC_CACHE_MAX_ENTRIES"),
+    )
+
+    rag_multi_hop_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("RAG_MULTI_HOP_ENABLED"),
+        description="Second retrieval pass using an LLM-suggested follow-up query (FAISS merge).",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

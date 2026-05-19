@@ -7,7 +7,7 @@ Starter stack for a **Gemini-first PDF RAG** proof of concept:
 - **LLM**: Gemini 2.0 Flash via **Vertex AI** and the official `**google-genai`** SDK (Application Default Credentials; no Gemini API keys).
 - **API / UI**: **Streamlit** (`rag_pdf_app`).
 - **Vector stores**: **FAISS** (bundled library, on-disk/index in `./data`), **Qdrant** (container).
-- **RAG**: **LangChain** plus **Langfuse** (self-hosted traces) and **RAGAS** (evaluation tooling in code).
+- **RAG**: **LangChain** plus **Langfuse** (self-hosted traces) and **RAGAS** (evaluation tooling in code); optional **Phase 4** semantic answer cache and LLM-guided multi-hop retrieval (env-toggled).
 - **PDFs**: **Docling**, **PyMuPDF**, multimodal Gemini flow to be layered on top.
 - **Quality**: **SonarQube** (Compose) + CI with **pre-commit (ruff)**, **pytest**, and optional Sonar scanner.
 
@@ -111,6 +111,8 @@ After **Phase 1** ingestion built `FAISS_STORE_PATH` and populated Qdrant, evalu
 
 Reports include **`retrieval_config`** (hybrid on/off, pools, RRF weights, page filters, **FAISS directory basename only**) so you can diff **baseline vs Phase 3** runs without leaking host paths. See **`docs/eval/README.md`** for a recall-first tuning checklist (watch **context_recall** when tuning hybrid).
 
+Keep **`RAG_SEMANTIC_CACHE_ENABLED=false`** during labeled evaluations so RAGAS sees fresh retrieval unless you explicitly measure cache behaviour.
+
 The CLI runs the same Phase 1 pipeline as Streamlit (dual retrieval → Gemini answer), scores outputs with **RAGAS** (faithfulness, answer relevancy, context precision vs reference answer, context recall), then applies an optional **Gemini judge** rubric on rows whose `Context_Content_Type` suggests tables, figures, or composite evidence.
 
 ```bash
@@ -154,6 +156,20 @@ uv sync --frozen --extra dev --extra phase3 --python 3.12
 ```
 
 **Re-ingest** PDFs after upgrading Phase 3 chunk metadata if you want `content_type` / `section_hint` populated on every chunk in existing indexes.
+
+### Phase 4 · Semantic cache & multi-hop retrieval
+
+Phase 4 modules (`semantic_cache.py`, `multi_hop.py`) are **off by default**.
+
+- **Semantic cache**: embed the retrieval query (same string as dense retrieval after stripping inline page windows). On cosine similarity ≥ **`RAG_SEMANTIC_CACHE_SIMILARITY_THRESHOLD`** vs any cached embedding, return the stored answer and skip retrieval/generation. **Disabled** whenever inline `pages X–Y` clauses or **`RAG_PAGE_FILTER_*`** apply. Persisted under **`RAG_SEMANTIC_CACHE_PATH`** (default `./data/semantic_rag_cache.json`, gitignored with `./data`).
+- **Multi-hop retrieval**: after the first dual retrieval, Gemini emits either **`DONE`** or one short follow-up query; a second **`retrieve_dual`** runs and **FAISS** hits are merged by `chunk_id` (Qdrant stays the first pass for side-by-side latency in the UI).
+
+```bash
+# In .env — see .env.example
+# RAG_SEMANTIC_CACHE_ENABLED=true
+# RAG_SEMANTIC_CACHE_SIMILARITY_THRESHOLD=0.92
+# RAG_MULTI_HOP_ENABLED=true
+```
 
 ---
 
