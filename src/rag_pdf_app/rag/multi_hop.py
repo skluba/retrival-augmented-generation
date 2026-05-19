@@ -7,6 +7,7 @@ stable baseline column in the UI).
 
 from __future__ import annotations
 
+import hashlib
 import logging
 
 from langchain_community.vectorstores import FAISS
@@ -136,6 +137,7 @@ def retrieve_dual_with_multi_hop(
         )
 
     follow_q = line[:512]
+    _LOG.debug("multi-hop follow-up query (not exposed in UI notes): %s", follow_q)
     dual2 = retrieve_dual(
         query=follow_q,
         embeddings=embeddings,
@@ -152,10 +154,12 @@ def retrieve_dual_with_multi_hop(
         dual2.faiss_hits,
         top_k=top_k,
     )
+    fq_digest = hashlib.sha256(follow_q.encode("utf-8", errors="replace")).hexdigest()
     notes = [
         *dual1.notes,
         "multi_hop_second_pass",
-        follow_q,
+        f"multi_hop_follow_query_sha256:{fq_digest}",
+        f"multi_hop_follow_query_len:{len(follow_q)}",
         f"multi_hop_merged_faiss_count:{len(merged)}",
     ]
     return (

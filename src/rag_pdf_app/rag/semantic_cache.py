@@ -4,7 +4,10 @@ Caches (query embedding → answer) pairs. Lookup uses cosine similarity against
 embeddings. Disabled when page-window constraints apply (see ``query.run_phase1_rag``).
 
 Cache files are **partitioned per corpus** (resolved FAISS store directory + Qdrant collection)
-so answers from one index cannot match queries against another.
+so answers from one index cannot match queries against another. Two workloads that write to the
+same resolved FAISS directory and collection name still share a partition (e.g. successive PDF
+uploads in one UI folder)—do not enable semantic cache on shared multi-tenant hosts unless each
+tenant uses isolated store paths or turns the feature off.
 
 Does **not** persist raw query strings by default (embedding + answer only).
 """

@@ -358,5 +358,6 @@ uses cosine similarity.
 
                         if r.notes:
                             with st.expander("Score interpretation"):
-                                for line in r.notes:
-                                    st.markdown(f"- {line}")
+                                # Plain text: dual_retrieval_notes can contain LLM-derived strings;
+                                # avoid st.markdown so document/markdown injection cannot run here.
+                                st.code("\n".join(r.notes), language=None)

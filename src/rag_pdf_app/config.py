@@ -136,6 +136,12 @@ class Settings(BaseSettings):
     rag_semantic_cache_enabled: bool = Field(
         default=True,
         validation_alias=AliasChoices("RAG_SEMANTIC_CACHE_ENABLED"),
+        description=(
+            "Answer cache keyed by query embedding; files are partitioned by resolved FAISS store "
+            "path and Qdrant collection. On shared Streamlit workers, reuse of the same paths "
+            "across different uploads still shares one cache—disable for strict multi-tenant "
+            "hosts or isolate indices per tenant."
+        ),
     )
     rag_semantic_cache_path: str = Field(
         default="./data/semantic_rag_cache.json",
