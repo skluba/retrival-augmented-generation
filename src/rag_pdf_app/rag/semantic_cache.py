@@ -3,11 +3,15 @@
 Caches (query embedding → answer) pairs. Lookup uses cosine similarity against stored
 embeddings. Disabled when page-window constraints apply (see ``query.run_phase1_rag``).
 
+Cache files are **partitioned per corpus** (resolved FAISS store directory + Qdrant collection)
+so answers from one index cannot match queries against another.
+
 Does **not** persist raw query strings by default (embedding + answer only).
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import threading
@@ -19,6 +23,27 @@ _SCHEMA_VERSION = 1
 
 # Norms from finite embeddings should not be compared with `== 0.0` (Sonar / FP hygiene).
 _MIN_L2_NORM = 1e-15
+
+
+def partitioned_semantic_cache_path(
+    *,
+    cache_path_template: str,
+    faiss_store_path: str,
+    qdrant_collection: str,
+) -> str:
+    """Return a JSON cache path scoped to FAISS directory + Qdrant collection.
+
+    Avoids cross-corpus and cross-tenant cache hits when ``RAG_SEMANTIC_CACHE_PATH`` is shared.
+    """
+
+    faiss_key = str(Path(faiss_store_path).expanduser().resolve())
+    payload = f"{faiss_key}\x00{qdrant_collection}".encode()
+    digest = hashlib.sha256(payload).hexdigest()[:16]
+    base = Path(cache_path_template).expanduser()
+    if base.suffix.lower() == ".json":
+        return str(base.parent / f"{base.stem}_{digest}{base.suffix}")
+    base.mkdir(parents=True, exist_ok=True)
+    return str(base / f"semantic_cache_{digest}.json")
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:

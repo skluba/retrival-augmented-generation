@@ -17,7 +17,7 @@ from rag_pdf_app.rag.embeddings import vertex_text_embeddings
 from rag_pdf_app.rag.multi_hop import retrieve_dual_with_multi_hop
 from rag_pdf_app.rag.query_page_window import strip_inline_page_window
 from rag_pdf_app.rag.retrieve import BackendTiming, DualRetrievalResult, RetrievalHit
-from rag_pdf_app.rag.semantic_cache import get_semantic_cache
+from rag_pdf_app.rag.semantic_cache import get_semantic_cache, partitioned_semantic_cache_path
 from rag_pdf_app.rag.stores import qdrant_client
 from rag_pdf_app.vertex_gemini import generate_rag_answer
 
@@ -62,6 +62,14 @@ def _semantic_cache_eligible(settings: Settings, inline_pages: tuple[int, int] |
     return True
 
 
+def _semantic_cache_path(settings: Settings) -> str:
+    return partitioned_semantic_cache_path(
+        cache_path_template=settings.rag_semantic_cache_path,
+        faiss_store_path=settings.faiss_store_path,
+        qdrant_collection=settings.rag_qdrant_collection,
+    )
+
+
 def _maybe_store_semantic_cache(
     settings: Settings,
     *,
@@ -75,7 +83,7 @@ def _maybe_store_semantic_cache(
         or not _semantic_cache_eligible(settings, inline_pages)
     ):
         return
-    get_semantic_cache(settings.rag_semantic_cache_path).put(
+    get_semantic_cache(_semantic_cache_path(settings)).put(
         query_embedding,
         answer,
         max_entries=settings.rag_semantic_cache_max_entries,
@@ -132,7 +140,7 @@ def run_phase1_rag(
     query_embedding_for_cache: list[float] | None = None
     if settings.rag_semantic_cache_enabled and _semantic_cache_eligible(settings, inline_pages):
         query_embedding_for_cache = embedder.embed_query(retrieval_query)
-        hit = get_semantic_cache(settings.rag_semantic_cache_path).lookup_best(
+        hit = get_semantic_cache(_semantic_cache_path(settings)).lookup_best(
             query_embedding_for_cache,
             similarity_threshold=settings.rag_semantic_cache_similarity_threshold,
         )

@@ -107,9 +107,9 @@ def retrieve_dual_with_multi_hop(
             settings,
             max_output_tokens=128,
         )
-    except Exception as exc:
-        _LOG.warning("multi-hop refinement LLM call failed: %s", exc)
-        notes = [*dual1.notes, f"multi_hop_skipped:refinement_error:{exc}"]
+    except Exception:
+        _LOG.warning("multi-hop refinement LLM call failed", exc_info=True)
+        notes = [*dual1.notes, "multi_hop_skipped:refinement_error"]
         return (
             DualRetrievalResult(
                 faiss_hits=dual1.faiss_hits,

@@ -10,7 +10,47 @@ from rag_pdf_app.rag.semantic_cache import (
     FileBackedSemanticCache,
     clear_semantic_cache_instances_for_tests,
     cosine_similarity,
+    partitioned_semantic_cache_path,
 )
+
+
+def test_partitioned_semantic_cache_path_scopes_by_faiss_and_collection(tmp_path: Path) -> None:
+    tpl = str(tmp_path / "semantic_rag_cache.json")
+    a = tmp_path / "store_a"
+    b = tmp_path / "store_b"
+    a.mkdir()
+    b.mkdir()
+    p1 = partitioned_semantic_cache_path(
+        cache_path_template=tpl,
+        faiss_store_path=str(a),
+        qdrant_collection="col_one",
+    )
+    p2 = partitioned_semantic_cache_path(
+        cache_path_template=tpl,
+        faiss_store_path=str(b),
+        qdrant_collection="col_one",
+    )
+    p3 = partitioned_semantic_cache_path(
+        cache_path_template=tpl,
+        faiss_store_path=str(a),
+        qdrant_collection="col_two",
+    )
+    assert p1 != p2
+    assert p1 != p3
+    assert p1.endswith(".json")
+    assert Path(p1).parent == tmp_path
+
+
+def test_partitioned_semantic_cache_path_directory_template(tmp_path: Path) -> None:
+    d = tmp_path / "cache_root"
+    d.mkdir()
+    p = partitioned_semantic_cache_path(
+        cache_path_template=str(d),
+        faiss_store_path=str(tmp_path / "faiss"),
+        qdrant_collection="c",
+    )
+    assert Path(p).parent == d
+    assert "semantic_cache_" in Path(p).name
 
 
 def test_cosine_similarity_aligned_vectors() -> None:
