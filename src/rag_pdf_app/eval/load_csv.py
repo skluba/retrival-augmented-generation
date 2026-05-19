@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from rag_pdf_app.eval.models import EvalGoldRow
-from rag_pdf_app.eval.paths import DEFAULT_IFC_EVAL_CSV
+from rag_pdf_app.eval.paths import DEFAULT_IFC_EVAL_CSV, EVAL_DATASET_CSV_NAME
 
 
 def load_ifc_eval_csv(path: Path | None = None) -> list[EvalGoldRow]:
@@ -17,8 +17,8 @@ def load_ifc_eval_csv(path: Path | None = None) -> list[EvalGoldRow]:
     if not csv_path.is_file():
         raise FileNotFoundError(
             f"Evaluation CSV not found at {csv_path}. "
-            "Place `RAG_evaluation_dataset-convertcsv.csv` at the repository root "
-            "or pass --csv."
+            f"Place `{EVAL_DATASET_CSV_NAME}` next to `pyproject.toml` (repo root or `/app` in "
+            "Docker) or pass --csv."
         )
 
     df = pd.read_csv(csv_path, dtype=str, keep_default_na=False)

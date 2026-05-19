@@ -7,9 +7,13 @@ from rag_pdf_app.eval.pipeline import (
 )
 from rag_pdf_app.eval.run import main as run_evaluation_cli
 
+from rag_pdf_app.eval.paths import EVAL_DATASET_CSV_NAME, repo_root
+
 __all__ = [
+    "EVAL_DATASET_CSV_NAME",
     "load_ifc_eval_csv",
     "pipeline_rows_to_ragas_samples",
+    "repo_root",
     "run_evaluation_cli",
     "run_phase1_on_eval_rows",
 ]
