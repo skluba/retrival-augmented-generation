@@ -117,9 +117,7 @@ def _build_judge_prompt(
     content_type: str,
     page_number: str,
 ) -> str:
-    sq = format_untrusted_eval_dataset_field(
-        "eval_question", question, max_chars=_MAX_QUESTION
-    )
+    sq = format_untrusted_eval_dataset_field("eval_question", question, max_chars=_MAX_QUESTION)
     sr = format_untrusted_eval_dataset_field(
         "reference_answer", reference_answer, max_chars=_MAX_REFERENCE
     )
