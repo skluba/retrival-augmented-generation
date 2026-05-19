@@ -123,6 +123,14 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("RAG_PAGE_FILTER_MAX"),
         description="Optional 1-based inclusive PDF page upper bound for retrieval filtering.",
     )
+    rag_eval_snapshot_include_absolute_paths: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("RAG_EVAL_SNAPSHOT_INCLUDE_ABSOLUTE_PATHS"),
+        description=(
+            "If true, embed resolved absolute FAISS directory in eval retrieval_config "
+            "(avoid when sharing reports)."
+        ),
+    )
 
 
 @lru_cache

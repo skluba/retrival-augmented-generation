@@ -8,7 +8,7 @@ Committed summaries for **Phase 2** (`rag-pdf-eval`) live here when you want Git
 2. **Dense baseline**: `RAG_HYBRID_ENABLED=false`, fixed `RAG_TOP_K`, pools irrelevant.
 3. **Hybrid run**: `RAG_HYBRID_ENABLED=true`; keep `RAG_TOP_K` identical for a fair comparison.
 
-Each report now embeds a **`retrieval_config`** block (JSON and Markdown) plus per-row **`dual_retrieval_notes`** and **`rag_hybrid_enabled`**. Use that to prove runs were configured as intended.
+Each report now embeds a **`retrieval_config`** block (JSON and Markdown) plus per-row **`dual_retrieval_notes`** and **`rag_hybrid_enabled`**. Use that to prove runs were configured as intended. **`faiss_store_basename`** is the directory leaf name only so shared reports do not expose absolute paths; set **`RAG_EVAL_SNAPSHOT_INCLUDE_ABSOLUTE_PATHS=true`** only for private debugging.
 
 ### Tuning hybrid toward higher context recall
 

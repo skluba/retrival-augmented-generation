@@ -12,6 +12,7 @@ def test_render_phase2_eval_markdown_includes_sections() -> None:
             "rag_hybrid_enabled": True,
             "rag_top_k": 5,
             "rag_rrf_sparse_weight": 1.15,
+            "faiss_store_basename": "faiss",
         },
         "ragas_summary_mean": {
             "faithfulness": 0.8,
@@ -77,6 +78,7 @@ def test_render_phase2_eval_markdown_includes_sections() -> None:
     assert "phase2_rag_eval_smoke.json" in md
     assert "## Retrieval configuration" in md
     assert "rag_hybrid_enabled" in md
+    assert "faiss_store_basename" in md
     assert "## RAGAS · dataset mean" in md
     assert "## RAGAS · mean by `Context_Content_Type`" in md
     assert "| text |" in md

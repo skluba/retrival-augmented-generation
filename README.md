@@ -109,7 +109,7 @@ uv run streamlit run src/rag_pdf_app/streamlit_app.py
 
 After **Phase 1** ingestion built `FAISS_STORE_PATH` and populated Qdrant, evaluate retrieval + generation against the labeled workbook at the repository root: `RAG_evaluation_dataset-convertcsv.csv` (commit that file for shared runs). `**tests/fixtures/ifc_eval_sample.csv`** exercises the loader in CI when the full CSV is absent.
 
-Reports include **`retrieval_config`** (hybrid on/off, pools, RRF weights, page filters) so you can diff **baseline vs Phase 3** runs. See **`docs/eval/README.md`** for a recall-first tuning checklist (watch **context_recall** when tuning hybrid).
+Reports include **`retrieval_config`** (hybrid on/off, pools, RRF weights, page filters, **FAISS directory basename only**) so you can diff **baseline vs Phase 3** runs without leaking host paths. See **`docs/eval/README.md`** for a recall-first tuning checklist (watch **context_recall** when tuning hybrid).
 
 The CLI runs the same Phase 1 pipeline as Streamlit (dual retrieval → Gemini answer), scores outputs with **RAGAS** (faithfulness, answer relevancy, context precision vs reference answer, context recall), then applies an optional **Gemini judge** rubric on rows whose `Context_Content_Type` suggests tables, figures, or composite evidence.
 
