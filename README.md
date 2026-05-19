@@ -35,7 +35,7 @@ docker compose --profile core --profile quality up --build -d
 docker compose --profile core --profile obs --profile quality up --build -d
 ```
 
-`rag-app` runs Streamlit (and `docker compose run rag-app …`) as **`app` (UID/GID 1000)** after a short root entrypoint that `chown`s `/app/data` so named volumes stay writable; do not force `--user root` in Compose unless you accept that risk.
+`rag-app` declares **`USER app`** in the image (Sonar-friendly non-root default). **`docker-compose.yml` sets `user: "0:0"`** so the entrypoint can `chown` `/app/data` on the named volume, then **`runuser`** starts Streamlit as **`app` (UID/GID 1000)**. For plain `docker run` with the same volume pattern, pass **`--user 0:0`** once so that bootstrap runs; omit it only if `/app/data` is already writable by UID 1000.
 
 Without `COMPOSE_PROFILES` **and** without `--profile`, no profiled containers start—which is deliberate.
 

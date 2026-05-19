@@ -8,6 +8,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    # Dockerfile defaults to USER app for scanners; entrypoint must run as root once to chown the
+    # named volume on /app/data, then it execs Streamlit as UID 1000.
+    user: "0:0"
     restart: unless-stopped
     env_file:
       - path: .env
