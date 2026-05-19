@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 
-
 _FIGURE_RE = re.compile(
     r"\b(figure|fig\.|chart|graph|diagram)\b",
     re.IGNORECASE,

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from rag_pdf_app.rag.sparse_bm25 import tokenize
 from rag_pdf_app.rag.models import RetrievalHit
+from rag_pdf_app.rag.sparse_bm25 import tokenize
 
 _LOG = logging.getLogger(__name__)
 

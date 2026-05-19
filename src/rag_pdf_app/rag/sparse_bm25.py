@@ -84,7 +84,9 @@ def faiss_snapshot_cache_key(faiss_root: str | Path) -> str:
 _BM25_CACHE: dict[str, BM25ChunkIndex] = {}
 
 
-def get_cached_bm25_index(store: FAISS, cache_key: str) -> tuple[BM25ChunkIndex | None, float, bool]:
+def get_cached_bm25_index(
+    store: FAISS, cache_key: str
+) -> tuple[BM25ChunkIndex | None, float, bool]:
     """Return (index, build_seconds, cache_hit)."""
 
     if cache_key in _BM25_CACHE:

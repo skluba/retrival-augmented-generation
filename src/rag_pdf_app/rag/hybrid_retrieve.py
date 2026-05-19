@@ -14,9 +14,9 @@ from rag_pdf_app.rag.hybrid_fusion import (
     intersect_page_windows,
     reciprocal_rank_fusion,
 )
+from rag_pdf_app.rag.models import RetrievalHit
 from rag_pdf_app.rag.query_page_window import inline_window_to_zero_based
 from rag_pdf_app.rag.rerank_phase3 import cross_encoder_rerank, metadata_boost_rerank
-from rag_pdf_app.rag.models import RetrievalHit
 from rag_pdf_app.rag.retrieve import faiss_similarity_hits
 from rag_pdf_app.rag.sparse_bm25 import (
     faiss_snapshot_cache_key,
@@ -112,7 +112,9 @@ def hybrid_faiss_retrieval(
 
     if bm25 is None:
         notes.append("bm25_unavailable_fallback_dense_only")
-        trimmed = [h for h in dense_hits if page_win is None or hit_overlaps_page_window(h, page_win)]
+        trimmed = [
+            h for h in dense_hits if page_win is None or hit_overlaps_page_window(h, page_win)
+        ]
         if not trimmed:
             trimmed = dense_hits
         dt_ms = (time.perf_counter() - t0) * 1000.0
