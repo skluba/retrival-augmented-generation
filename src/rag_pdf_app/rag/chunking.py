@@ -13,6 +13,7 @@ from rag_pdf_app.parsing.text_extractors import (
     extract_pdfminer_text_spans,
     extract_pypdf_metadata_and_plaintext,
 )
+from rag_pdf_app.rag.chunk_metadata import infer_chunk_content_type, infer_section_hint
 from rag_pdf_app.rag.models import TextChunk
 
 
@@ -27,6 +28,27 @@ def clean_text(text: str) -> str:
 def _chunk_id_from(parts: list[str], page_start: int, page_end: int, source: str) -> str:
     blob = "\n".join(parts) + f"|{page_start}|{page_end}|{source}"
     return hashlib.sha256(blob.encode("utf-8", errors="replace")).hexdigest()[:24]
+
+
+def _make_text_chunk(
+    seg: str,
+    *,
+    page_start: int,
+    page_end: int,
+    source: str,
+    structure_note: str | None,
+) -> TextChunk:
+    cid = _chunk_id_from([seg], page_start, page_end, source)
+    return TextChunk(
+        chunk_id=cid,
+        text=seg,
+        page_start=page_start,
+        page_end=page_end,
+        source=source,
+        structure_note=structure_note,
+        content_type=infer_chunk_content_type(seg, structure_note),
+        section_hint=infer_section_hint(seg),
+    )
 
 
 def _chunk_windows(text: str, chunk_size: int, overlap: int) -> list[str]:
@@ -56,11 +78,9 @@ def _chunks_from_merged_layout_block(
         seg = segment.strip()
         if not seg:
             continue
-        cid = _chunk_id_from([seg], ps, pe, source)
         out.append(
-            TextChunk(
-                chunk_id=cid,
-                text=seg,
+            _make_text_chunk(
+                seg,
                 page_start=ps,
                 page_end=pe,
                 source=source,
@@ -159,11 +179,9 @@ def chunks_from_pypdf_pages(
         if seg:
             mid = i + len(raw_seg) // 2
             pg = page_for_char_offset(mid)
-            cid = _chunk_id_from([seg], pg, pg, source)
             chunks.append(
-                TextChunk(
-                    chunk_id=cid,
-                    text=seg,
+                _make_text_chunk(
+                    seg,
                     page_start=pg,
                     page_end=pg,
                     source=source,
@@ -226,6 +244,8 @@ def chunks_to_langchain_payload(chunks: list[TextChunk]) -> tuple[list[str], lis
                 "page_end": c.page_end,
                 "source": c.source,
                 "structure_note": c.structure_note,
+                "content_type": c.content_type,
+                "section_hint": c.section_hint,
             }
         )
     return texts, metas

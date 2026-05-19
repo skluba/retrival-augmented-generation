@@ -128,6 +128,31 @@ Reports default to `reports/eval/phase2_rag_eval_<utc-timestamp>.json` with a **
 
 Run this **after each pipeline phase** you care about (e.g. after re-ingesting with new chunking or embedding settings) so regressions show up in the JSON deltas.
 
+### Phase 3 · Hybrid retrieval & re-ranking (FAISS leg)
+
+Phase 3 improves **FAISS** context selection (the **Qdrant** path stays dense-only for now). It is **off by default** so Phase 1 behaviour is unchanged until you opt in.
+
+- **Sparse + dense hybrid**: an on-disk **BM25** index is built from the FAISS docstore and fused with dense neighbours via **reciprocal rank fusion (RRF)** (`rag_pdf_app/rag/sparse_bm25.py`, `hybrid_fusion.py`, `hybrid_retrieve.py`).
+- **Metadata**: chunks gain coarse **`content_type`** and **`section_hint`** during ingestion (`chunk_metadata.py`, `chunking.py`). Context headers in the UI include `content_type`.
+- **Constraints**: optional **PDF page windows** come from env (`RAG_PAGE_FILTER_MIN` / `RAG_PAGE_FILTER_MAX`, 1-based inclusive) and/or inline queries such as `pages 10-20` (`query_page_window.py`, fused in `retrieve.py`).
+- **Re-ranking**: after fusion, candidates get a light **metadata overlap boost**, then an optional **cross-encoder** pass if you install the **`phase3`** extra (`rerank_phase3.py`). There is no LLM-as-judge or graph re-ranker in-tree yet.
+
+Enable hybrid retrieval:
+
+```bash
+# In .env — see .env.example for the full list
+RAG_HYBRID_ENABLED=true
+```
+
+Cross-encoder (pulls in PyTorch / `sentence-transformers`; omit if you only want BM25+dense RRF):
+
+```bash
+uv sync --frozen --extra dev --extra phase3 --python 3.12
+# e.g. RAG_CROSS_ENCODER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
+```
+
+**Re-ingest** PDFs after upgrading Phase 3 chunk metadata if you want `content_type` / `section_hint` populated on every chunk in existing indexes.
+
 ---
 
 ## GitHub Actions / SonarQube
