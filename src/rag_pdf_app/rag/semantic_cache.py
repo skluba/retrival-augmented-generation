@@ -17,6 +17,9 @@ from typing import Any
 
 _SCHEMA_VERSION = 1
 
+# Norms from finite embeddings should not be compared with `== 0.0` (Sonar / FP hygiene).
+_MIN_L2_NORM = 1e-15
+
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
     if len(a) != len(b) or not a:
@@ -24,7 +27,7 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b, strict=True))
     na = math.sqrt(sum(x * x for x in a))
     nb = math.sqrt(sum(y * y for y in b))
-    if na == 0.0 or nb == 0.0:
+    if na < _MIN_L2_NORM or nb < _MIN_L2_NORM:
         return 0.0
     return dot / (na * nb)
 
