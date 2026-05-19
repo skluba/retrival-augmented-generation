@@ -40,6 +40,17 @@ RUN uv sync --frozen --no-build --no-install-project --python 3.12 \
     && uv pip install --python 3.12 --no-deps .
 
 USER root
+# Strip write bits from baked-in corpus + source tree only (.venv stays writable for runtime caches).
+RUN chmod a-w /app/ifc-annual-report-2024-financials.pdf \
+        /app/RAG_evaluation_dataset-convertcsv.csv \
+        /app/pyproject.toml \
+        /app/uv.lock \
+        /app/README.md \
+    && chmod -R a-w /app/third_party/wheels /app/src
+
+# Default USER stays root so ENTRYPOINT can chown volume-mounted /app/data (often root-owned from
+# the host), then exec replaces PID 1 with the real command via `runuser -u app`. Streamlit and CLI
+# overrides run as UID/GID 1000, not as root.
 
 ENV PATH="/app/.venv/bin:$PATH" \
     VIRTUAL_ENV="/app/.venv" \
