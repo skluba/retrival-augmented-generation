@@ -29,6 +29,8 @@ def run_phase1_on_eval_rows(
                 ragas_extra={
                     "faiss_latency_ms": result.retrieval.faiss_timing.latency_ms,
                     "qdrant_latency_ms": result.retrieval.qdrant_timing.latency_ms,
+                    "dual_retrieval_notes": list(result.retrieval.notes),
+                    "rag_hybrid_enabled": settings.rag_hybrid_enabled,
                 },
             )
         )

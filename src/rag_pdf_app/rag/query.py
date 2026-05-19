@@ -14,6 +14,7 @@ from langchain_community.vectorstores import FAISS
 
 from rag_pdf_app.config import Settings
 from rag_pdf_app.rag.embeddings import vertex_text_embeddings
+from rag_pdf_app.rag.query_page_window import strip_inline_page_window
 from rag_pdf_app.rag.retrieve import DualRetrievalResult, RetrievalHit, retrieve_dual
 from rag_pdf_app.rag.stores import qdrant_client
 from rag_pdf_app.vertex_gemini import generate_rag_answer
@@ -52,7 +53,8 @@ def _format_context_block(hits: list[RetrievalHit], *, max_chars: int = 12000) -
     for i, h in enumerate(hits, start=1):
         ps = h.metadata.get("page_start", "?")
         pe = h.metadata.get("page_end", "?")
-        header = f"[{i}] pages {ps}–{pe}"
+        ct = h.metadata.get("content_type", "?")
+        header = f"[{i}] pages {ps}–{pe} · {ct}"
         block = f"{header}\n{h.text}"
         if used + len(block) > max_chars:
             break
@@ -90,6 +92,8 @@ def run_phase1_rag(
     embedder = vertex_text_embeddings(settings)
     qdr = qdrant_client(settings)
 
+    retrieval_query, inline_pages = strip_inline_page_window(query)
+
     dual: DualRetrievalResult
     prompt: str
     answer: str
@@ -100,19 +104,24 @@ def run_phase1_rag(
             input=_langfuse_safe_query_metrics(query),
         ) as trace_obs:
             dual = retrieve_dual(
-                query=query,
+                query=retrieval_query,
                 embeddings=embedder,
                 faiss_store=faiss_store,
                 qdrant=qdr,
                 collection=settings.rag_qdrant_collection,
                 top_k=settings.rag_top_k,
+                settings=settings,
+                inline_page_window_1based=inline_pages,
             )
             trace_obs.update(
                 output={
                     "faiss_latency_ms": dual.faiss_timing.latency_ms,
                     "qdrant_latency_ms": dual.qdrant_timing.latency_ms,
                 },
-                metadata={"retrieval_backends": ["faiss", "qdrant"]},
+                metadata={
+                    "retrieval_backends": ["faiss", "qdrant"],
+                    "rag_hybrid_enabled": settings.rag_hybrid_enabled,
+                },
             )
 
             ctx = _format_context_block(dual.faiss_hits)
@@ -136,12 +145,14 @@ def run_phase1_rag(
         )
 
     dual = retrieve_dual(
-        query=query,
+        query=retrieval_query,
         embeddings=embedder,
         faiss_store=faiss_store,
         qdrant=qdr,
         collection=settings.rag_qdrant_collection,
         top_k=settings.rag_top_k,
+        settings=settings,
+        inline_page_window_1based=inline_pages,
     )
     ctx = _format_context_block(dual.faiss_hits)
     prompt = build_phase1_prompt(query, ctx)
