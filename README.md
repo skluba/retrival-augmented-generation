@@ -118,12 +118,13 @@ uv run rag-pdf-eval
 # Smoke subset + custom output path
 uv run rag-pdf-eval --max-rows 3 --output-json ./reports/eval/smoke.json
 
-# Skip judge; judge every row instead of heuristics-only
+# Skip judge; judge every row; Markdown only as JSON sidecar
 uv run rag-pdf-eval --skip-judge
 uv run rag-pdf-eval --judge-all
+uv run rag-pdf-eval --no-output-markdown
 ```
 
-Reports default to `reports/eval/phase2_rag_eval_<utc-timestamp>.json` (overall means, per-row scores, means stratified by `Context_Content_Type`, judge outputs).
+Reports default to `reports/eval/phase2_rag_eval_<utc-timestamp>.json` with a **sibling `.md`** summary (overall means, means by `Context_Content_Type`, judge stats, lowest-faithfulness rows). Pass `--no-output-markdown` if you only want JSON. The `reports/` directory is gitignored; copy the `.md` into something like `docs/eval/` when you want a rendered snapshot committed to the repo.
 
 Run this **after each pipeline phase** you care about (e.g. after re-ingesting with new chunking or embedding settings) so regressions show up in the JSON deltas.
 

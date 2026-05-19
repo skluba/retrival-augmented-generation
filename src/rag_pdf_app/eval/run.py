@@ -14,6 +14,7 @@ from ragas.utils import safe_nanmean
 from rag_pdf_app.config import clear_settings_cache, get_settings
 from rag_pdf_app.eval.llm_judge import judge_answer_row, should_run_multimodal_judge
 from rag_pdf_app.eval.load_csv import load_ifc_eval_csv
+from rag_pdf_app.eval.markdown_report import render_phase2_eval_markdown
 from rag_pdf_app.eval.paths import repo_root
 from rag_pdf_app.eval.pipeline import (
     pipeline_rows_to_ragas_samples,
@@ -23,6 +24,25 @@ from rag_pdf_app.eval.ragas_runner import run_ragas_evaluation
 from rag_pdf_app.eval.reporting import ragas_summary_by_content_type
 from rag_pdf_app.rag.embeddings import vertex_text_embeddings
 from rag_pdf_app.rag.stores import load_faiss_index
+
+
+def _persist_phase2_reports(
+    out_path: Path,
+    payload: dict[str, object],
+    *,
+    write_markdown: bool,
+) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Wrote report: {out_path}", flush=True)
+    if not write_markdown:
+        return
+    md_path = out_path.with_suffix(".md")
+    md_path.write_text(
+        render_phase2_eval_markdown(payload, source_json_basename=out_path.name),
+        encoding="utf-8",
+    )
+    print(f"Wrote Markdown report: {md_path}", flush=True)
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
@@ -59,6 +79,11 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         type=Path,
         default=None,
         help="Write full report JSON under reports/eval/ (default if omitted: auto path).",
+    )
+    p.add_argument(
+        "--no-output-markdown",
+        action="store_true",
+        help="Do not write a sibling .md summary next to the JSON report.",
     )
     p.add_argument(
         "--ragas-timeout",
@@ -169,9 +194,7 @@ def main(argv: list[str] | None = None) -> int:
         "llm_judge": judge_rows,
     }
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Wrote report: {out_path}", flush=True)
+    _persist_phase2_reports(out_path, payload, write_markdown=not args.no_output_markdown)
     print(ragas_result, flush=True)
     print("\nMean RAGAS by Context_Content_Type:\n", by_type.to_string(), flush=True)
     return 0
