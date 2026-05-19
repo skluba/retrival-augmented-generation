@@ -81,6 +81,22 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("RAG_HYBRID_SPARSE_POOL"),
     )
     rag_rrf_k: int = Field(default=60, ge=1, le=300, validation_alias=AliasChoices("RAG_RRF_K"))
+    rag_rrf_dense_weight: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=5.0,
+        validation_alias=AliasChoices("RAG_RRF_DENSE_WEIGHT"),
+        description="RRF weight for the dense (FAISS) ranking leg.",
+    )
+    rag_rrf_sparse_weight: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=5.0,
+        validation_alias=AliasChoices("RAG_RRF_SPARSE_WEIGHT"),
+        description=(
+            "RRF weight for the sparse (BM25) leg; raise slightly (e.g. 1.15) for recall."
+        ),
+    )
     rag_cross_encoder_model: str | None = Field(
         default=None,
         validation_alias=AliasChoices("RAG_CROSS_ENCODER_MODEL"),

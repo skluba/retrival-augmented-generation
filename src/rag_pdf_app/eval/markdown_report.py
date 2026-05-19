@@ -72,6 +72,19 @@ def _append_intro(
         lines.append("")
 
 
+def _append_retrieval_config(lines: list[str], raw: object) -> None:
+    if not isinstance(raw, Mapping):
+        return
+    lines.append("## Retrieval configuration")
+    lines.append("")
+    rows = [
+        [_md_cell(str(k), max_len=160), _md_cell(str(v), max_len=240)]
+        for k, v in sorted(raw.items(), key=lambda kv: str(kv[0]))
+    ]
+    lines.append(_markdown_table(["Setting", "Value"], rows))
+    lines.append("")
+
+
 def _append_ragas_summary(lines: list[str], mean: object) -> None:
     if not isinstance(mean, Mapping):
         return
@@ -249,6 +262,7 @@ def render_phase2_eval_markdown(
 
     lines: list[str] = []
     _append_intro(lines, payload, source_json_basename=source_json_basename)
+    _append_retrieval_config(lines, payload.get("retrieval_config"))
     _append_ragas_summary(lines, payload.get("ragas_summary_mean"))
     _append_ragas_by_type(lines, payload.get("ragas_by_context_content_type"))
     _append_judge(lines, payload.get("llm_judge"))

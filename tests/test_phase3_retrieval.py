@@ -19,6 +19,13 @@ def test_reciprocal_rank_fusion_prefers_shared_top_docs() -> None:
     assert scores["c"] > scores["d"]
 
 
+def test_reciprocal_rank_fusion_weights_boost_lexical_leg() -> None:
+    dense = ["x", "y"]
+    sparse = ["y", "x"]
+    weighted = reciprocal_rank_fusion([dense, sparse], rrf_k=60, weights=[1.0, 3.0])
+    assert weighted["y"] > weighted["x"]
+
+
 def test_strip_inline_page_window() -> None:
     q, win = strip_inline_page_window("Net income pages 4-8 for IFC")
     assert win == (4, 8)

@@ -124,7 +124,11 @@ def hybrid_faiss_retrieval(
     sparse_ranked = bm25.top_chunk_scores(query, sparse_pool)
     sparse_ids = [cid for cid, _ in sparse_ranked]
     dense_ids = [h.chunk_id for h in dense_hits]
-    rrf_scores = reciprocal_rank_fusion([dense_ids, sparse_ids], rrf_k=settings.rag_rrf_k)
+    rrf_scores = reciprocal_rank_fusion(
+        [dense_ids, sparse_ids],
+        rrf_k=settings.rag_rrf_k,
+        weights=[settings.rag_rrf_dense_weight, settings.rag_rrf_sparse_weight],
+    )
     merged_ids = sorted(rrf_scores.keys(), key=lambda cid: rrf_scores[cid], reverse=True)
 
     merged_hits = _filter_or_fallback(

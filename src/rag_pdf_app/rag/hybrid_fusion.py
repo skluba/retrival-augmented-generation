@@ -7,13 +7,27 @@ from collections.abc import Iterable
 from rag_pdf_app.rag.models import RetrievalHit
 
 
-def reciprocal_rank_fusion(rankings: list[list[str]], *, rrf_k: int = 60) -> dict[str, float]:
-    """Standard RRF over ordered chunk-id lists (higher is better)."""
+def reciprocal_rank_fusion(
+    rankings: list[list[str]],
+    *,
+    rrf_k: int = 60,
+    weights: list[float] | None = None,
+) -> dict[str, float]:
+    """RRF over ordered chunk-id lists (higher is better).
+
+    Optional ``weights`` scales each ranking leg (same length as ``rankings``). Use a slightly
+    higher sparse/BM25 weight to bias fusion toward lexical overlap when improving recall.
+    """
+
+    if weights is None:
+        weights = [1.0] * len(rankings)
+    if len(weights) != len(rankings):
+        raise ValueError("weights length must match rankings length")
 
     scores: dict[str, float] = {}
-    for ranked in rankings:
+    for ranked, w in zip(rankings, weights, strict=True):
         for rank, cid in enumerate(ranked, start=1):
-            scores[cid] = scores.get(cid, 0.0) + 1.0 / (rrf_k + rank)
+            scores[cid] = scores.get(cid, 0.0) + float(w) / (rrf_k + rank)
     return scores
 
 

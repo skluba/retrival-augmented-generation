@@ -34,6 +34,18 @@ class DualRetrievalResult:
     notes: list[str] = field(default_factory=list)
 
 
+def _effective_faiss_k(store: FAISS, k: int) -> int:
+    """Clamp requested neighbour count to the number of indexed vectors."""
+
+    if k < 1:
+        return 1
+    idx = getattr(store, "index", None)
+    ntotal = getattr(idx, "ntotal", None)
+    if isinstance(ntotal, int) and ntotal > 0:
+        return min(k, ntotal)
+    return k
+
+
 def faiss_retrieved_chunk_texts(dual: DualRetrievalResult) -> list[str]:
     """Texts from FAISS hits in retrieval order (matches Phase 1 context ordering)."""
 
@@ -42,7 +54,8 @@ def faiss_retrieved_chunk_texts(dual: DualRetrievalResult) -> list[str]:
 
 def _faiss_hits(store: FAISS, query: str, k: int) -> tuple[list[RetrievalHit], float]:
     t0 = time.perf_counter()
-    pairs = store.similarity_search_with_score(query, k=k)
+    k_eff = _effective_faiss_k(store, k)
+    pairs = store.similarity_search_with_score(query, k=k_eff)
     dt_ms = (time.perf_counter() - t0) * 1000.0
     hits: list[RetrievalHit] = []
     for doc, score in pairs:

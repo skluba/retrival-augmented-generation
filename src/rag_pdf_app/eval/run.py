@@ -8,20 +8,23 @@ import sys
 import warnings
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
+import pandas as pd
 from ragas.utils import safe_nanmean
 
-from rag_pdf_app.config import clear_settings_cache, get_settings
+from rag_pdf_app.config import Settings, clear_settings_cache, get_settings
 from rag_pdf_app.eval.llm_judge import judge_answer_row, should_run_multimodal_judge
 from rag_pdf_app.eval.load_csv import load_ifc_eval_csv
 from rag_pdf_app.eval.markdown_report import render_phase2_eval_markdown
+from rag_pdf_app.eval.models import EvalPipelineRow
 from rag_pdf_app.eval.paths import repo_root
 from rag_pdf_app.eval.pipeline import (
     pipeline_rows_to_ragas_samples,
     run_phase1_on_eval_rows,
 )
 from rag_pdf_app.eval.ragas_runner import run_ragas_evaluation
-from rag_pdf_app.eval.reporting import ragas_summary_by_content_type
+from rag_pdf_app.eval.reporting import eval_retrieval_config_snapshot, ragas_summary_by_content_type
 from rag_pdf_app.rag.embeddings import vertex_text_embeddings
 from rag_pdf_app.rag.stores import load_faiss_index
 
@@ -94,6 +97,74 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
+def _llm_judge_rows_for_pipeline(
+    settings: Settings,
+    pipeline_rows: list[EvalPipelineRow],
+    *,
+    judge_all: bool,
+) -> list[dict[str, object]]:
+    judge_rows: list[dict[str, object]] = []
+    for pr in pipeline_rows:
+        gold = pr.gold
+        run_judge = judge_all or should_run_multimodal_judge(gold.context_content_type)
+        if not run_judge:
+            continue
+        try:
+            outcome = judge_answer_row(
+                settings,
+                question=gold.question,
+                reference_answer=gold.ground_truth_answer,
+                generated_answer=pr.response,
+                gold_context=gold.ground_truth_context,
+                content_type=gold.context_content_type,
+                page_number=gold.page_number,
+            )
+            scores = outcome.scores.model_dump()
+        except Exception as exc:  # noqa: BLE001
+            scores = {"error": str(exc)}
+        judge_rows.append(
+            {
+                "question": gold.question,
+                "context_content_type": gold.context_content_type,
+                "page_number": gold.page_number,
+                "scores": scores,
+            }
+        )
+    return judge_rows
+
+
+def _phase2_report_payload(
+    *,
+    settings: Settings,
+    pipeline_rows: list[EvalPipelineRow],
+    combined_df: pd.DataFrame,
+    by_type: pd.DataFrame,
+    ragas_result: Any,
+    judge_rows: list[dict[str, object]],
+) -> dict[str, object]:
+    metric_keys = list(ragas_result.scores[0].keys()) if ragas_result.scores else []
+    ragas_summary_mean = {
+        k: float(safe_nanmean([row[k] for row in ragas_result.scores])) for k in metric_keys
+    }
+    return {
+        "generated_at_utc": datetime.now(tz=UTC).isoformat(),
+        "retrieval_config": eval_retrieval_config_snapshot(settings),
+        "ragas_summary_mean": ragas_summary_mean,
+        "ragas_by_context_content_type": by_type.reset_index().to_dict(orient="records"),
+        "per_row_ragas": combined_df.assign(
+            context_content_type=[r.gold.context_content_type for r in pipeline_rows],
+            page_number=[r.gold.page_number for r in pipeline_rows],
+            dual_retrieval_notes=[
+                list(r.ragas_extra.get("dual_retrieval_notes") or []) for r in pipeline_rows
+            ],
+            rag_hybrid_enabled=[
+                bool(r.ragas_extra.get("rag_hybrid_enabled")) for r in pipeline_rows
+            ],
+        ).to_dict(orient="records"),
+        "llm_judge": judge_rows,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     clear_settings_cache()
@@ -144,32 +215,7 @@ def main(argv: list[str] | None = None) -> int:
     judge_rows: list[dict[str, object]] = []
     if not args.skip_judge:
         print("Running LLM judge…", flush=True)
-        for pr in pipeline_rows:
-            gold = pr.gold
-            run_judge = args.judge_all or should_run_multimodal_judge(gold.context_content_type)
-            if not run_judge:
-                continue
-            try:
-                outcome = judge_answer_row(
-                    settings,
-                    question=gold.question,
-                    reference_answer=gold.ground_truth_answer,
-                    generated_answer=pr.response,
-                    gold_context=gold.ground_truth_context,
-                    content_type=gold.context_content_type,
-                    page_number=gold.page_number,
-                )
-                scores = outcome.scores.model_dump()
-            except Exception as exc:  # noqa: BLE001
-                scores = {"error": str(exc)}
-            judge_rows.append(
-                {
-                    "question": gold.question,
-                    "context_content_type": gold.context_content_type,
-                    "page_number": gold.page_number,
-                    "scores": scores,
-                }
-            )
+        judge_rows = _llm_judge_rows_for_pipeline(settings, pipeline_rows, judge_all=args.judge_all)
 
     out_path = args.output_json
     if out_path is None:
@@ -178,21 +224,14 @@ def main(argv: list[str] | None = None) -> int:
         stamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
         out_path = reports / f"phase2_rag_eval_{stamp}.json"
 
-    metric_keys = list(ragas_result.scores[0].keys()) if ragas_result.scores else []
-    ragas_summary_mean = {
-        k: float(safe_nanmean([row[k] for row in ragas_result.scores])) for k in metric_keys
-    }
-
-    payload: dict[str, object] = {
-        "generated_at_utc": datetime.now(tz=UTC).isoformat(),
-        "ragas_summary_mean": ragas_summary_mean,
-        "ragas_by_context_content_type": by_type.reset_index().to_dict(orient="records"),
-        "per_row_ragas": combined_df.assign(
-            context_content_type=[r.gold.context_content_type for r in pipeline_rows],
-            page_number=[r.gold.page_number for r in pipeline_rows],
-        ).to_dict(orient="records"),
-        "llm_judge": judge_rows,
-    }
+    payload = _phase2_report_payload(
+        settings=settings,
+        pipeline_rows=pipeline_rows,
+        combined_df=combined_df,
+        by_type=by_type,
+        ragas_result=ragas_result,
+        judge_rows=judge_rows,
+    )
 
     _persist_phase2_reports(out_path, payload, write_markdown=not args.no_output_markdown)
     print(ragas_result, flush=True)
