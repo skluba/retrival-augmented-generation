@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     langfuse_host: str = "http://localhost:3000"
 
     rag_hybrid_enabled: bool = Field(
-        default=False,
+        default=True,
         validation_alias=AliasChoices("RAG_HYBRID_ENABLED"),
     )
     rag_hybrid_dense_pool: int = Field(
@@ -134,7 +134,7 @@ class Settings(BaseSettings):
 
     # Phase 4 · Semantic answer cache (embedding similarity; disabled with page-window filters).
     rag_semantic_cache_enabled: bool = Field(
-        default=False,
+        default=True,
         validation_alias=AliasChoices("RAG_SEMANTIC_CACHE_ENABLED"),
     )
     rag_semantic_cache_path: str = Field(
@@ -156,7 +156,7 @@ class Settings(BaseSettings):
     )
 
     rag_multi_hop_enabled: bool = Field(
-        default=False,
+        default=True,
         validation_alias=AliasChoices("RAG_MULTI_HOP_ENABLED"),
         description="Second retrieval pass using an LLM-suggested follow-up query (FAISS merge).",
     )

@@ -227,9 +227,10 @@ else:
             "**Provide the PDF via upload** (normal flow). Ingest runs once (Vertex embeddings → "
             "**FAISS** on disk + **Qdrant**). Each question retrieves on **both** backends for "
             "latency/score comparison; Gemini answers use **FAISS** hits."
-            "\n\n**Phase 4 (optional, `.env`):** `RAG_SEMANTIC_CACHE_ENABLED` reuses answers for "
-            "similar questions (skipped when using page-window filters). "
-            "`RAG_MULTI_HOP_ENABLED` runs a second retrieval pass after an LLM-suggested query."
+            "\n\n**Phase 4 (`.env`, on by default):** `RAG_SEMANTIC_CACHE_ENABLED` reuses answers "
+            "for similar questions (skipped when using page-window filters). "
+            "`RAG_MULTI_HOP_ENABLED` runs a second retrieval pass after an LLM-suggested query. "
+            "Set either to `false` to disable."
         )
 
         upload_rag = st.file_uploader(
