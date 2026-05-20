@@ -249,6 +249,7 @@ def chunks_to_langchain_payload(chunks: list[TextChunk]) -> tuple[list[str], lis
                 "chunk_kind": c.chunk_kind,
                 "table_id": c.table_id,
                 "table_csv_preview": c.table_csv_preview,
+                "image_xref": c.image_xref,
             }
         )
     return texts, metas

@@ -197,6 +197,39 @@ class Settings(BaseSettings):
         description="Streamlit: when retrieved passages include CSV previews, offer simple charts.",
     )
 
+    # Phase 5.2 · Figure / chart chunks (captions + nearby text indexed for retrieval).
+    rag_image_indexing_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("RAG_IMAGE_INDEXING_ENABLED"),
+        description=(
+            "During ingest, index Gemini (or fallback) descriptions of raster figures plus "
+            "neighbouring text as searchable chunks."
+        ),
+    )
+    rag_ingest_gemini_image_captions: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("RAG_INGEST_GEMINI_IMAGE_CAPTIONS"),
+        description="Vertex Gemini captions for extracted images during ingest.",
+    )
+    rag_image_index_min_area_px: int = Field(
+        default=8192,
+        ge=0,
+        le=4_000_000,
+        validation_alias=AliasChoices("RAG_IMAGE_INDEX_MIN_AREA_PX"),
+        description=(
+            "Skip raster images smaller than width×height area unless they carry caption/text cues."
+        ),
+    )
+    rag_image_require_figure_label_nearby: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("RAG_IMAGE_REQUIRE_FIGURE_LABEL_NEARBY"),
+        description=(
+            "Drop embedded rasters unless nearby PDF text names a numbered figure ('Figure 3', "
+            "'Fig. 2', …). Reduces captions for logos or layout sprites paired with unrelated "
+            "section titles (annual-report IFC layout)."
+        ),
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

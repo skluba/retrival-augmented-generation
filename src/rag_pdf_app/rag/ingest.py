@@ -11,6 +11,7 @@ from rag_pdf_app.config import Settings
 from rag_pdf_app.parsing.pipeline import parse_pdf_bytes
 from rag_pdf_app.rag.chunking import build_chunks_from_pdf_bytes, chunks_to_langchain_payload
 from rag_pdf_app.rag.embeddings import vertex_embed_documents_batched, vertex_text_embeddings
+from rag_pdf_app.rag.image_chunks import image_text_chunks_from_parsed_pdf
 from rag_pdf_app.rag.stores import (
     qdrant_client,
     reset_qdrant_collection,
@@ -53,22 +54,44 @@ def ingest_pdf_bytes_to_indexes(
     )
     notes.extend(cnotes)
 
-    if settings.rag_table_indexing_enabled:
+    need_structured = settings.rag_table_indexing_enabled or settings.rag_image_indexing_enabled
+    parsed = None
+    if need_structured:
+        embed_b64 = settings.rag_image_indexing_enabled
+        img_caption = (
+            settings.rag_image_indexing_enabled and settings.rag_ingest_gemini_image_captions
+        )
+        table_sum = (
+            settings.rag_table_indexing_enabled and settings.rag_ingest_gemini_table_summaries
+        )
         parsed = parse_pdf_bytes(
             pdf_bytes,
             filename,
             settings=settings,
-            embed_image_base64=False,
-            gemini_image_captions=False,
-            gemini_table_summaries=settings.rag_ingest_gemini_table_summaries,
+            embed_image_base64=embed_b64,
+            gemini_image_captions=img_caption,
+            gemini_table_summaries=table_sum,
             run_docling=settings.rag_ingest_run_docling,
             run_camelot=settings.rag_ingest_run_camelot,
         )
+        notes.extend(f"parse_note:{n}" for n in parsed.parsing_notes)
+
+    if settings.rag_table_indexing_enabled and parsed is not None:
         tchunks = table_text_chunks_from_parsed_pdf(parsed)
         chunks, merge_mode = merge_narrative_and_table_chunks(chunks, tchunks)
         notes.append(f"table_index_merge:{merge_mode}")
         notes.append(f"table_chunk_count:{len(tchunks)}")
-        notes.extend(f"table_parse_note:{n}" for n in parsed.parsing_notes)
+
+    if settings.rag_image_indexing_enabled and parsed is not None:
+        ichunks = image_text_chunks_from_parsed_pdf(
+            parsed,
+            min_area_px=settings.rag_image_index_min_area_px,
+            require_figure_label_nearby=settings.rag_image_require_figure_label_nearby,
+        )
+        chunks, img_merge = merge_narrative_and_table_chunks(chunks, ichunks)
+        notes.append(f"image_index_merge:{img_merge}")
+        notes.append(f"image_chunk_count:{len(ichunks)}")
+        notes.append(f"image_raster_candidates:{len(parsed.images)}")
 
     if not chunks:
         raise ValueError("No text extracted from PDF — cannot index.")

@@ -10,6 +10,7 @@ import os
 import tempfile
 
 from rag_pdf_app.config import Settings
+from rag_pdf_app.parsing.figure_cues import nearby_text_has_explicit_figure_label
 from rag_pdf_app.parsing.images import extract_images_pymupdf
 from rag_pdf_app.parsing.models import ImageBlock, ParsedPdf, TableBlock, TextSpan
 from rag_pdf_app.parsing.relations import (
@@ -202,14 +203,29 @@ def _enrich_images(
     gemini_image_captions: bool,
     notes: list[str],
 ) -> None:
+    kept: list[ImageBlock] = []
     for img in images_blocks:
         _apply_image_neighbors(img, layout_spines, spans_by_id)
+        drop_without_figure_cue = (
+            settings.rag_image_require_figure_label_nearby
+            and not nearby_text_has_explicit_figure_label(
+                img.contextual_snippet_above,
+                img.contextual_snippet_below,
+            )
+        )
+        if drop_without_figure_cue:
+            notes.append(f"img_dropped_no_figure_cue:xref={img.xref}:page={img.page_index + 1}")
+            continue
         _caption_image_if_enabled(
             img,
             settings,
             gemini_image_captions=gemini_image_captions,
             notes=notes,
         )
+        kept.append(img)
+
+    images_blocks.clear()
+    images_blocks.extend(kept)
 
 
 def parse_pdf_bytes(
@@ -275,6 +291,7 @@ def parse_pdf_bytes(
     )
 
     images_blocks = extract_images_pymupdf(data, embed_base64=embed_image_base64)
+    notes.append(f"image_raster_candidates_raw:{len(images_blocks)}")
     _enrich_images(
         images_blocks,
         layout_spines,

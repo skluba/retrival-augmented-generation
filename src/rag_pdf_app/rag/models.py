@@ -38,11 +38,9 @@ class TextChunk(BaseModel):
         default=None,
         description="Approximate heading / first-line cue for display and light retrieval boosts.",
     )
-    chunk_kind: Literal["narrative", "pdf_table"] = Field(
+    chunk_kind: Literal["narrative", "pdf_table", "pdf_image"] = Field(
         default="narrative",
-        description=(
-            "Phase 5.1: pdf_table rows are structured table index chunks (Markdown/CSV bodies)."
-        ),
+        description="narrative=text windows; pdf_table=Phase 5.1; pdf_image=Phase 5.2 captions.",
     )
     table_id: str | None = Field(
         default=None,
@@ -51,4 +49,8 @@ class TextChunk(BaseModel):
     table_csv_preview: str | None = Field(
         default=None,
         description="Optional CSV snippet for UI charting (bounded at index time).",
+    )
+    image_xref: int | None = Field(
+        default=None,
+        description="PyMuPDF xref when chunk_kind is pdf_image.",
     )
