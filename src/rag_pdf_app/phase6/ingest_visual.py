@@ -1,4 +1,4 @@
-"""Ingest raster PDF patches → multilingual CLIP embeddings → dedicated Qdrant collection."""
+"""Ingest raster PDF patches → HF CLIP vision embeddings + multilingual text-aligned queries."""
 
 from __future__ import annotations
 
@@ -7,7 +7,10 @@ from typing import Any
 from qdrant_client import QdrantClient
 
 from rag_pdf_app.config import Settings
-from rag_pdf_app.phase6.clip_embed import png_list_to_embeddings, sentence_transformers_clip_backend
+from rag_pdf_app.phase6.clip_embed import (
+    ensure_phase6_clip_dims_aligned,
+    png_list_to_embeddings,
+)
 from rag_pdf_app.phase6.models import PatchRecord, Phase6IngestOutcome
 from rag_pdf_app.phase6.pdf_patches import iter_pdf_patch_records, sha256_pdf
 from rag_pdf_app.phase6.visual_store import (
@@ -32,9 +35,12 @@ def ingest_phase6_visual_pdf(
 
     notes: list[str] = []
     pdf_digest = sha256_pdf(pdf_bytes)
-    model_key = settings.phase6_sentence_transformers_clip_model
+    model_key = (
+        f"text:{settings.phase6_sentence_transformers_clip_model}|"
+        f"image:{settings.phase6_clip_image_encoder_model}"
+    )
 
-    _model, embedding_dim = sentence_transformers_clip_backend(settings)
+    embedding_dim = ensure_phase6_clip_dims_aligned(settings, device=device)
     reset_phase6_visual_collection(client, settings.phase6_qdrant_collection, embedding_dim)
     notes.append(f"phase6_reset_collection:{settings.phase6_qdrant_collection}:{embedding_dim}")
 

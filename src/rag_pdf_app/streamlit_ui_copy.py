@@ -193,11 +193,11 @@ def phase6_optional_deps_hint() -> str | None:
 
 PHASE6_SUBHEADER = "Phase 6 — visual patches + multilingual CLIP (ColPali-style scaffold)"
 PHASE6_INTRO_MARKDOWN = (
-    "Raster PDF pages → **tiling crops** → **Sentence-Transformers CLIP** embeddings in a "
-    "**separate Qdrant collection**. Retrieval uses cosine prefetch plus optional **pseudo "
-    "MaxSim** (reshape pooled vectors into synthetic token rows). Gemini receives **PNG "
-    "crops** rerendered from the PDF for transparency and layout fidelity vs Phase 5.2 "
-    "figure **captions-only** indexing."
+    "Raster PDF pages → **tiling crops** → **Hugging Face CLIP ViT embeddings** (`PHASE6_CLIP_*`) "
+    "in a separate Qdrant collection; multilingual **CLIP-aligned queries** flow through "
+    "Sentence Transformers (`PHASE6_SENTENCE_TRANSFORMERS_CLIP_MODEL`). Retrieval uses cosine "
+    "prefetch plus optional **pseudo MaxSim**. Gemini receives **PNG crops** rerendered "
+    "from the PDF for transparency vs Phase 5.2 figure **captions-only** indexing."
 )
 
 PHASE6_QDRANT_CAPTION_TEMPLATE = "Phase 6 Qdrant · `{collection}`"

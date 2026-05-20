@@ -264,6 +264,22 @@ class Settings(BaseSettings):
     phase6_sentence_transformers_clip_model: str = Field(
         default="sentence-transformers/clip-ViT-B-32-multilingual-v1",
         validation_alias=AliasChoices("PHASE6_SENTENCE_TRANSFORMERS_CLIP_MODEL"),
+        description=(
+            "SentenceTransformers **text-only** encoder aligned with CLIP text embeddings "
+            "(multilingual; no ViT). Phase 6 encodes PNG patches via PHASE6_CLIP_IMAGE_ENCODER_MODEL "
+            "(must match embedding dim, e.g. ViT-B/32 ⇔ 512)."
+        ),
+    )
+    phase6_clip_image_encoder_model: str = Field(
+        default="openai/clip-vit-base-patch32",
+        validation_alias=AliasChoices(
+            "PHASE6_CLIP_IMAGE_ENCODER_MODEL",
+            "PHASE6_CLIP_IMAGE_MODEL",
+        ),
+        description=(
+            "Hugging Face CLIP vision backbone for raster patches. Projection dim must equal "
+            "the multilingual query encoder dimension (defaults pair at 512d)."
+        ),
     )
     phase6_embedding_batch_size: int = Field(
         default=16,

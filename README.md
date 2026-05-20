@@ -220,7 +220,7 @@ Tiny icons are skipped when their pixel area is below **`RAG_IMAGE_INDEX_MIN_ARE
 
 Phase 6 is an **alternate RAG spine** optimised for layouts where pixels matter beyond extractable OCR text:
 
-- **Ingest**: PyMuPDF rasterises PDF pages (`PHASE6_RENDER_DPI`) and tiles overlapping crops (`PHASE6_PATCH_*`). Each crop is encoded with multilingual **CLIP** (**`sentence-transformers`**, gated behind the **`phase6`** optional extra) into a dedicated Qdrant collection (`PHASE6_QDRANT_COLLECTION`, default **`phase6_visual_patches`**). Ingest resets that collection (**single-upload lab semantics**) so embeddings always match one active PDF snapshot.
+- **Ingest**: PyMuPDF rasterises PDF pages (`PHASE6_RENDER_DPI`) and tiles overlapping crops (`PHASE6_PATCH_*`). Each crop is encoded with a Hugging Face **CLIP vision tower** (`PHASE6_CLIP_IMAGE_ENCODER_MODEL`, default **OpenAI ViT-B/32**), while natural-language retrieval queries use Sentence Transformers (**`sentence-transformers`**, **`phase6`** extra) multilingual **CLIP-aligned text** embeddings (`PHASE6_SENTENCE_TRANSFORMERS_CLIP_MODEL` — **text-only** checkpoint; gated behind Torch). Stored in **`PHASE6_QDRANT_COLLECTION`** (default **`phase6_visual_patches`**); ingest resets that collection (**single-upload lab semantics**).
 - **Retrieval**: Qdrant dense cosine prefetch (`PHASE6_VISUAL_PREFETCH`) → optional deterministic **pseudo-MaxSim**: reshape each pooled embedding into **`PHASE6_MAXSIM_SLOTS`** rows and approximate ColBERT/ColPali late interaction (research scaffold, **not** a pretrained ColPali checkpoint).
 - **Generation**: Gemini receives **PNG crops** *rerendered* from vectors + patch geometry so answers can cite labelled regions (`[P1]`, …).
 - **Compare vs Phase 1**: baseline RAG consumes **tokens** (+ table / figure-caption chunks); Phase 6 carries **dense visual evidence**. Use Streamlit tabs side-by-side and check disagreements via crops vs textual hits.
@@ -231,6 +231,14 @@ Heavy dependencies (**Torch transitively**) — sync explicitly:
 uv sync --frozen --extra dev --extra phase6 --python 3.12   # refreshes uv.lock via `uv lock` when pyproject shifts
 uv run pytest tests/test_phase6_*.py
 ```
+
+**Docker Compose (`rag-app`)**: after `compose up`, `/app/src` is **read-only** (immutable app tree). A plain `uv sync --extra phase6` tries to reinstall the workspace as **editable** and updates `src/rag_pdf_app.egg-info`, which fails with **“Cannot update time stamp … egg-info”**. Install only the Phase 6 dependency set into `.venv`:
+
+```bash
+docker exec -u app <rag-app-container> uv sync --frozen --no-install-project --extra dev --extra phase6 --python 3.12
+```
+
+Rebuild the image if `pyproject.toml` / `uv.lock` gained `phase6` after your last image build (`docker compose build --no-cache rag-app`).
 
 See [.env.example](.env.example) for `PHASE6_*` keys.
 
