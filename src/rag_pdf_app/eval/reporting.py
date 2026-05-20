@@ -40,6 +40,9 @@ def eval_retrieval_config_snapshot(settings: Settings) -> dict[str, Any]:
         "rag_semantic_cache_enabled": settings.rag_semantic_cache_enabled,
         "rag_semantic_cache_similarity_threshold": settings.rag_semantic_cache_similarity_threshold,
         "rag_multi_hop_enabled": settings.rag_multi_hop_enabled,
+        "rag_table_indexing_enabled": settings.rag_table_indexing_enabled,
+        "rag_ingest_run_camelot": settings.rag_ingest_run_camelot,
+        "rag_plotting_enabled": settings.rag_plotting_enabled,
     }
     if settings.rag_eval_snapshot_include_absolute_paths:
         snap["faiss_store_path_absolute"] = str(Path(faiss_path).expanduser().resolve())

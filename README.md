@@ -7,7 +7,7 @@ Starter stack for a **Gemini-first PDF RAG** proof of concept:
 - **LLM**: Gemini 2.0 Flash via **Vertex AI** and the official `**google-genai`** SDK (Application Default Credentials; no Gemini API keys).
 - **API / UI**: **Streamlit** (`rag_pdf_app`).
 - **Vector stores**: **FAISS** (bundled library, on-disk/index in `./data`), **Qdrant** (container).
-- **RAG**: **LangChain** plus **Langfuse** (self-hosted traces) and **RAGAS** (evaluation tooling in code); **Phase 3** hybrid retrieval (BM25 + dense RRF) and **Phase 4** semantic answer cache plus LLM-guided multi-hop are **on by default** (opt out via `.env`).
+- **RAG**: **LangChain** plus **Langfuse** (self-hosted traces) and **RAGAS** (evaluation tooling in code); **Phase 3** hybrid retrieval (BM25 + dense RRF), **Phase 4** semantic answer cache plus LLM-guided multi-hop, and **Phase 5.1** table indexing + table-aware prompting are **on by default** (opt out via `.env`).
 - **PDFs**: **Docling**, **PyMuPDF**, multimodal Gemini flow to be layered on top.
 - **Quality**: **SonarQube** (Compose) + CI with **pre-commit (ruff)**, **pytest**, and optional Sonar scanner.
 
@@ -176,6 +176,23 @@ Phase 4 modules (`semantic_cache.py`, `multi_hop.py`) are **on by default**. Set
 # RAG_SEMANTIC_CACHE_ENABLED=false
 # RAG_SEMANTIC_CACHE_SIMILARITY_THRESHOLD=0.92
 # RAG_MULTI_HOP_ENABLED=false
+```
+
+### Phase 5.1 · Multimodal RAG — tables
+
+**Table indexing** runs during **ingest** when **`RAG_TABLE_INDEXING_ENABLED=true`** (default): the pipeline calls the same structured parser used in the Parse tab (`parse_pdf_bytes`), extracts **PyMuPDF** tables (and optional **Camelot** when you enable **`RAG_INGEST_RUN_CAMELOT`** for trusted PDFs), builds extra `TextChunk` rows with `content_type=table_structured`, and embeds them into **the same** FAISS/Qdrant corpus as narrative chunks so hybrid BM25 + dense retrieval can surface tabular evidence.
+
+- **Prompting**: when top **FAISS** hits include `chunk_kind=pdf_table`, Gemini receives additional instructions to treat passages as tables and to perform only **simple, explicit** arithmetic on shown cells.
+- **Streamlit plotting**: if a retrieved row carries **`table_csv_preview`** in metadata (from the original `as_csv`), the UI shows a **dataframe** plus an automatic **bar chart** for numeric columns (`table_plot.py`; disable with **`RAG_PLOTTING_ENABLED=false`**).
+
+Re-ingest after changing table-related settings so indexes contain (or omit) table chunks.
+
+```bash
+# In .env — see .env.example
+# RAG_TABLE_INDEXING_ENABLED=false
+# RAG_INGEST_RUN_CAMELOT=true   # trusted PDFs only
+# RAG_INGEST_RUN_DOCLING=false  # faster ingest; less context from Docling
+# RAG_PLOTTING_ENABLED=false
 ```
 
 ---
