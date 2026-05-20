@@ -266,7 +266,8 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("PHASE6_SENTENCE_TRANSFORMERS_CLIP_MODEL"),
         description=(
             "SentenceTransformers **text-only** encoder aligned with CLIP text embeddings "
-            "(multilingual; no ViT). Phase 6 encodes PNG patches via PHASE6_CLIP_IMAGE_ENCODER_MODEL "
+            "(multilingual; no ViT). Phase 6 encodes PNG patches via "
+            "PHASE6_CLIP_IMAGE_ENCODER_MODEL "
             "(must match embedding dim, e.g. ViT-B/32 ⇔ 512)."
         ),
     )

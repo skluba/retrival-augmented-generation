@@ -132,7 +132,7 @@ def phase6_multilingual_text_sentence_transformer(
         m = _text_model_cache[name]
         dim = _ST_DIM_CACHE.get(name)
         if dim is None:
-            dim = getattr(m, "get_sentence_embedding_dimension")()
+            dim = m.get_sentence_embedding_dimension()
             _ST_DIM_CACHE[name] = int(dim)
         return m, int(dim)
 
