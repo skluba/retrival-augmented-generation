@@ -309,10 +309,7 @@ else:
                     else:
                         st.markdown("### Answer")
                         st.write(result.answer)
-                        if (
-                            not result.semantic_cache_hit
-                            and settings_obj.rag_plotting_enabled
-                        ):
+                        if not result.semantic_cache_hit and settings_obj.rag_plotting_enabled:
                             df_plot, plot_note = dataframe_from_hits(
                                 result.retrieval.faiss_hits,
                                 settings_obj,
@@ -354,10 +351,7 @@ else:
                             st.caption(r.faiss_timing.metric)
                             for h in r.faiss_hits:
                                 kind = h.metadata.get("chunk_kind", "narrative")
-                                title = (
-                                    f"FAISS · {kind} · {h.chunk_id[:12]}… · "
-                                    f"score {h.score:.4f}"
-                                )
+                                title = f"FAISS · {kind} · {h.chunk_id[:12]}… · score {h.score:.4f}"
                                 with st.expander(title):
                                     st.text(h.text[:2000])
                         with c2:

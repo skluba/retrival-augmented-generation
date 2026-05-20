@@ -117,9 +117,7 @@ def _context_has_structured_tables(hits: list[RetrievalHit]) -> bool:
     return False
 
 
-def build_phase1_prompt(
-    query: str, context_text: str, *, table_context: bool = False
-) -> str:
+def build_phase1_prompt(query: str, context_text: str, *, table_context: bool = False) -> str:
     table_clause = ""
     if table_context:
         table_clause = (

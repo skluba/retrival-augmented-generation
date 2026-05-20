@@ -40,7 +40,9 @@ class TextChunk(BaseModel):
     )
     chunk_kind: Literal["narrative", "pdf_table"] = Field(
         default="narrative",
-        description="Phase 5.1: pdf_table rows are structured table index chunks (Markdown/CSV bodies).",
+        description=(
+            "Phase 5.1: pdf_table rows are structured table index chunks (Markdown/CSV bodies)."
+        ),
     )
     table_id: str | None = Field(
         default=None,
