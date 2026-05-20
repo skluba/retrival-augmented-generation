@@ -230,6 +230,79 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Phase 6 · Visual-patch multimodal RAG (CLIP + optional pseudo-MaxSim; install --extra phase6).
+    phase6_qdrant_collection: str = Field(
+        default="phase6_visual_patches",
+        validation_alias=AliasChoices("PHASE6_QDRANT_COLLECTION"),
+        description="Separate Qdrant collection for multilingual CLIP patch embeddings.",
+    )
+    phase6_render_dpi: float = Field(
+        default=144.0,
+        ge=36.0,
+        le=300.0,
+        validation_alias=AliasChoices("PHASE6_RENDER_DPI"),
+        description="Rasterisation DPI before patch tiling.",
+    )
+    phase6_patch_size_px: int = Field(
+        default=256,
+        ge=64,
+        le=1024,
+        validation_alias=AliasChoices("PHASE6_PATCH_SIZE_PX"),
+    )
+    phase6_patch_stride_px: int = Field(
+        default=192,
+        ge=16,
+        le=1024,
+        validation_alias=AliasChoices("PHASE6_PATCH_STRIDE_PX"),
+    )
+    phase6_max_pages: int = Field(
+        default=40,
+        ge=1,
+        le=512,
+        validation_alias=AliasChoices("PHASE6_MAX_PAGES"),
+    )
+    phase6_sentence_transformers_clip_model: str = Field(
+        default="sentence-transformers/clip-ViT-B-32-multilingual-v1",
+        validation_alias=AliasChoices("PHASE6_SENTENCE_TRANSFORMERS_CLIP_MODEL"),
+    )
+    phase6_embedding_batch_size: int = Field(
+        default=16,
+        ge=1,
+        le=128,
+        validation_alias=AliasChoices("PHASE6_EMBEDDING_BATCH_SIZE"),
+    )
+    phase6_ingest_encode_batch_size: int = Field(
+        default=8,
+        ge=1,
+        le=64,
+        validation_alias=AliasChoices("PHASE6_INGEST_ENCODE_BATCH_SIZE"),
+    )
+    phase6_visual_prefetch: int = Field(
+        default=96,
+        ge=8,
+        le=512,
+        validation_alias=AliasChoices("PHASE6_VISUAL_PREFETCH"),
+        description="Qdrant cosine hits before pseudo-MaxSim rerank.",
+    )
+    phase6_visual_top_k: int = Field(
+        default=6,
+        ge=1,
+        le=48,
+        validation_alias=AliasChoices("PHASE6_VISUAL_TOP_K"),
+    )
+    phase6_visual_maxsim_rerank: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("PHASE6_VISUAL_MAXSIM_RERANK"),
+        description="Deterministic reshape + MaxSim on CLIP pooled vectors (ColPali-style probe).",
+    )
+    phase6_maxsim_slots: int = Field(
+        default=8,
+        ge=2,
+        le=32,
+        validation_alias=AliasChoices("PHASE6_MAXSIM_SLOTS"),
+        description="Pseudo-token splits; embedding dim must be divisible evenly.",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -37,7 +37,9 @@ except Exception as exc:  # noqa: BLE001
     st.error("Missing or invalid environment configuration.")
     st.exception(exc)
 else:
-    overview_tab, rag_tab = st.tabs(["Overview", "Ingest & query (RAG)"])
+    overview_tab, rag_tab, phase6_tab = st.tabs(
+        ["Overview", "Ingest & query (RAG)", "Phase 6 (visual patches)"]
+    )
 
     with overview_tab:
         st.success("Loaded settings from environment.")
@@ -258,3 +260,221 @@ uses cosine similarity.
                                 # Plain text: dual_retrieval_notes can contain LLM-derived strings;
                                 # avoid st.markdown so document/markdown injection cannot run here.
                                 st.code("\n".join(r.notes), language=None)
+
+    def _phase6_optional_deps_hint() -> str | None:
+        try:
+            import PIL  # noqa: F401, PLC0415
+        except ImportError:
+            return (
+                "**Pillow** is missing (`pip install pillow` or "
+                "`uv sync --frozen --extra dev --extra phase6`)."
+            )
+        try:
+            import sentence_transformers  # noqa: F401, PLC0415
+        except ImportError:
+            return (
+                "**sentence-transformers** is missing — run "
+                "`uv sync --frozen --extra dev --extra phase6 --python 3.12` (pulls Torch + CLIP)."
+            )
+        return None
+
+    with phase6_tab:
+        st.subheader("Phase 6 — visual patches + multilingual CLIP (ColPali-style scaffold)")
+        st.markdown(
+            "Raster PDF pages → **tiling crops** → **Sentence-Transformers CLIP** embeddings in a "
+            "**separate Qdrant collection**. Retrieval uses cosine prefetch plus optional **pseudo "
+            "MaxSim** (reshape pooled vectors into synthetic token rows). Gemini receives **PNG "
+            "crops** rerendered from the PDF for transparency and layout fidelity vs Phase 5.2 "
+            "figure **captions-only** indexing."
+        )
+        miss = _phase6_optional_deps_hint()
+        if miss:
+            st.warning(miss + " Reload Streamlit after install.")
+            st.markdown(
+                "Phase 6 uses `PHASE6_*` env vars — "
+                "see [.env.example](.env.example) and README §Phase 6."
+            )
+        else:
+            import io as _phase6_io
+
+            from rag_pdf_app.phase6.coords import patch_placement_from_payload, rerender_patch_png
+            from rag_pdf_app.phase6.ingest_visual import ingest_phase6_visual_pdf
+            from rag_pdf_app.phase6.retrieve_visual import retrieve_phase6_visual_patches
+            from rag_pdf_app.rag.stores import qdrant_client
+
+            st.caption(f"Phase 6 Qdrant · `{settings_obj.phase6_qdrant_collection}`")
+
+            upload_vis = st.file_uploader(
+                "Upload PDF (Phase 6 · rebuilds Phase 6 collection)",
+                type=["pdf"],
+                key="phase6_pdf_upload",
+            )
+
+            ingest_col_left, ingest_col_right = st.columns(2)
+            with ingest_col_left:
+                if st.button("Ingest Phase 6 (CLIP patches)", type="primary", key="p6_ingest"):
+                    if upload_vis is None:
+                        st.warning("Upload a PDF first.")
+                    else:
+                        raw_vis = upload_vis.getvalue()
+                        name_vis = upload_vis.name
+                        with st.spinner("Rasterising patches + CLIP + Qdrant…"):
+                            try:
+                                qdr = qdrant_client(settings_obj)
+                                outcome = ingest_phase6_visual_pdf(
+                                    qdr, settings_obj, raw_vis, name_vis
+                                )
+                            except Exception as exc:  # noqa: BLE001
+                                st.error("Phase 6 ingest failed (GPU/memory, Pillow, Torch, PDF).")
+                                st.exception(exc)
+                            else:
+                                st.session_state["phase6_pdf_bytes"] = raw_vis
+                                st.session_state["phase6_pdf_sha256"] = outcome.pdf_sha256
+                                st.session_state["phase6_source_name"] = name_vis
+                                st.session_state["phase6_ingest"] = outcome
+                                st.success(
+                                    f"{outcome.patch_count} patches · "
+                                    f"{outcome.vector_dimension}d · "
+                                    f"Qdrant **`{outcome.qdrant_collection}`** · "
+                                    f"`{outcome.embedding_model_name}`"
+                                )
+                                if outcome.notes:
+                                    with st.expander("Ingest notes"):
+                                        st.code("\n".join(outcome.notes), language=None)
+
+            with ingest_col_right:
+                if st.button("Forget Phase 6 session PDF", key="p6_clear"):
+                    for key in ("phase6_pdf_bytes", "phase6_pdf_sha256", "phase6_source_name"):
+                        st.session_state.pop(key, None)
+                    st.success("Phase 6 session PDF cleared.")
+
+            if st.session_state.get("phase6_pdf_bytes"):
+                digest = str(st.session_state.get("phase6_pdf_sha256", ""))
+                digest_disp = digest[:18] + "…" if len(digest) > 18 else (digest or "?")
+                fname = str(st.session_state.get("phase6_source_name") or "upload.pdf")
+                st.caption(
+                    f"In-memory PDF **`{fname}`** · "
+                    f"sha256 `{digest_disp}` (thumbnails + Gemini crops)."
+                )
+
+            q_visual = st.text_area(
+                "Question (CLIP retrieval + Gemini over crops)",
+                height=96,
+                key="phase6_question",
+            )
+            rerender_dpi_slider = st.slider(
+                "Rerender DPI for Gemini crops / thumbnails",
+                min_value=int(settings_obj.phase6_render_dpi),
+                max_value=min(216, max(int(settings_obj.phase6_render_dpi), 216)),
+                value=int(settings_obj.phase6_render_dpi),
+                help=(
+                    "Higher DPI improves serif text clarity; ingest raster DPI "
+                    "stays tied to PHASE6_RENDER_DPI."
+                ),
+            )
+
+            if st.button("Retrieve + answer (Gemini multimodal)", key="p6_ask"):
+                pdf_buf_local = st.session_state.get("phase6_pdf_bytes")
+                pdf_digest = str(st.session_state.get("phase6_pdf_sha256") or "").strip()
+                if not pdf_buf_local:
+                    st.warning("Ingest Phase 6 for this PDF first (or re-upload after reload).")
+                elif not pdf_digest:
+                    st.warning("Missing PDF digest — run Phase 6 ingest.")
+                elif not q_visual.strip():
+                    st.warning("Enter a question.")
+                else:
+                    from rag_pdf_app.vertex_gemini import generate_visual_rag_answer_from_patches
+
+                    qdr_local = qdrant_client(settings_obj)
+                    hits_local = []
+                    telem_local: dict[str, str] = {}
+                    thumbs: list[bytes] = []
+                    try:
+                        with st.spinner("CLIP retrieve + patch crops…"):
+                            hits_local, telem_local = retrieve_phase6_visual_patches(
+                                qdr_local,
+                                settings_obj,
+                                query=q_visual.strip(),
+                                pdf_sha256=pdf_digest,
+                                device=None,
+                            )
+                            thumbs = []
+                            for hit in hits_local:
+                                pay = hit.payload
+                                thumbs.append(
+                                    rerender_patch_png(
+                                        pdf_buf_local,
+                                        patch_page_index=int(pay["page_index"]),
+                                        placement=patch_placement_from_payload(pay),
+                                        pixmap_page_width=int(pay["pixmap_page_width"]),
+                                        pixmap_page_height=int(pay["pixmap_page_height"]),
+                                        dpi=float(rerender_dpi_slider),
+                                    )
+                                )
+                        if telem_local:
+                            with st.expander("Retrieval telemetry"):
+                                st.json(telem_local)
+
+                        if not hits_local:
+                            st.warning(
+                                "No patches returned — try another question, widen "
+                                "`PHASE6_VISUAL_PREFETCH`, ingest more pages, or lower "
+                                "`PHASE6_PATCH_STRIDE_PX` / `PHASE6_PATCH_SIZE_PX` overlap."
+                            )
+                        else:
+                            with st.spinner("Gemini multimodal answer…"):
+                                labelled = [(f"[P{i}]", b) for i, b in enumerate(thumbs, start=1)]
+                                answer_txt = generate_visual_rag_answer_from_patches(
+                                    settings_obj,
+                                    user_query=q_visual.strip(),
+                                    labelled_patch_pngs=labelled,
+                                )
+
+                            st.markdown("### Answer")
+                            st.write(answer_txt)
+
+                            st.markdown("### Source attribution · rerendered crops")
+                            for idx, png in enumerate(thumbs, start=1):
+                                hit = hits_local[idx - 1]
+                                pay = hit.payload
+                                pg = int(pay.get("page_index", 0)) + 1
+                                r_ix = pay.get("row_index")
+                                c_ix = pay.get("col_index")
+                                cap = (
+                                    f"**[P{idx}]** · PDF page **`{pg}`** · patch tile "
+                                    f"**r{r_ix}c{c_ix}**"
+                                )
+                                if settings_obj.phase6_visual_maxsim_rerank and (
+                                    hit.coarse_score is not None
+                                    and abs(hit.coarse_score - hit.score) > 1e-6
+                                ):
+                                    cap += (
+                                        " · prefetch cos ≈ "
+                                        f"`{hit.coarse_score:.4f}` · rerank `{hit.score:.4f}`"
+                                    )
+                                else:
+                                    cap += f" · score `{hit.score:.4f}`"
+                                st.markdown(cap)
+                                st.image(
+                                    _phase6_io.BytesIO(png),
+                                    caption=None,
+                                    use_container_width=True,
+                                )
+
+                            with st.expander("Phase 1 vs Phase 6 — what to compare"):
+                                st.markdown(
+                                    """
+**Phase 1 (+ 5.x)** indexes **tokens** — narrative/table JSON, optional **Gemini captions** for
+figures (no vectors over pixels). Answers combine **hybrid textual** snippets only.
+
+**Phase 6** indexes **CLIP patch embeddings** (+ optional pseudo-MaxSim rerank), then sends PNG
+rerenders into Gemini — useful when OCR text is unreliable or visuals carry the semantics, at the
+cost of heavier ingest (Torch) and heuristic layout tiling.
+
+Pose the **same prompt** here and under **Ingest & query (RAG)**—if answers diverge, compare the
+shown crops vs textual passages to diagnose lexical vs spatial evidence mismatch.
+"""
+                                )
+                    except Exception as exc:  # noqa: BLE001
+                        st.error("Phase 6 query failed.")
+                        st.exception(exc)

@@ -46,6 +46,11 @@ dev = [
 phase3 = [
   "sentence-transformers>=3.0.0",
 ]
+phase6 = [
+  # Multilingual CLIP patch encoder + Pillow for PNG crops (heavy: pulls Torch transitively).
+  "pillow>=10.4.0",
+  "sentence-transformers>=3.0.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
