@@ -12,6 +12,8 @@ def _minimal_settings(**kwargs: object) -> Settings:
     base: dict[str, object] = {
         "google_cloud_project": "test-proj",
         "faiss_store_path": "./data/faiss",
+        # Do not inherit workspace .env toggles in CI / dev machines.
+        "rag_eval_snapshot_include_absolute_paths": False,
     }
     base.update(kwargs)
     return Settings(**base)

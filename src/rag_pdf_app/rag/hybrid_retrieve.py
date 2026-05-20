@@ -26,6 +26,8 @@ from rag_pdf_app.rag.sparse_bm25 import (
 
 _LOG = logging.getLogger(__name__)
 
+_cross_encoder_skip_warning_emitted: dict[str, bool] = {"value": False}
+
 
 def _hit_for_chunk(
     store: FAISS,
@@ -153,8 +155,14 @@ def hybrid_faiss_retrieval(
             pool = cross_encoder_rerank(query, pool, model_name=settings.rag_cross_encoder_model)
             notes.append("cross_encoder_applied")
         except RuntimeError as exc:
-            notes.append(f"cross_encoder_skipped:{exc}")
-            _LOG.warning("cross-encoder rerank skipped: %s", exc)
+            notes.append("cross_encoder_skipped")
+            if not _cross_encoder_skip_warning_emitted["value"]:
+                _LOG.warning(
+                    "cross-encoder rerank skipped (further skips suppressed this process): %s",
+                    exc,
+                    exc_info=True,
+                )
+                _cross_encoder_skip_warning_emitted["value"] = True
 
     final = pool[:top_k]
     dt_ms = (time.perf_counter() - t0) * 1000.0

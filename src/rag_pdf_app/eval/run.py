@@ -94,6 +94,15 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         default=240,
         help="Per-metric RAGAS timeout seconds (Vertex latency).",
     )
+    p.add_argument(
+        "--disable-phase4",
+        action="store_true",
+        help=(
+            "For this eval run only: force semantic cache + multi-hop off (ignores .env). "
+            "Use when you want every row to take one retrieval path and no similarity-cache "
+            "shortcuts for RAGAS."
+        ),
+    )
     return p.parse_args(argv)
 
 
@@ -169,6 +178,18 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     clear_settings_cache()
     settings = get_settings()
+    if args.disable_phase4:
+        settings = settings.model_copy(
+            update={
+                "rag_multi_hop_enabled": False,
+                "rag_semantic_cache_enabled": False,
+            }
+        )
+        print(
+            "Eval: Phase 4 disabled for this run (--disable-phase4): "
+            "semantic cache + multi-hop off.",
+            flush=True,
+        )
 
     gold_rows = load_ifc_eval_csv(args.csv)
     if args.max_rows and args.max_rows > 0:

@@ -37,6 +37,9 @@ def eval_retrieval_config_snapshot(settings: Settings) -> dict[str, Any]:
         "rag_page_filter_max": settings.rag_page_filter_max,
         "faiss_store_basename": _faiss_store_dir_basename(faiss_path),
         "rag_qdrant_collection": settings.rag_qdrant_collection,
+        "rag_semantic_cache_enabled": settings.rag_semantic_cache_enabled,
+        "rag_semantic_cache_similarity_threshold": settings.rag_semantic_cache_similarity_threshold,
+        "rag_multi_hop_enabled": settings.rag_multi_hop_enabled,
     }
     if settings.rag_eval_snapshot_include_absolute_paths:
         snap["faiss_store_path_absolute"] = str(Path(faiss_path).expanduser().resolve())

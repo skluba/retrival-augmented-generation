@@ -5,10 +5,12 @@ Committed summaries for **Phase 2** (`rag-pdf-eval`) live here when you want Git
 ## Baseline vs Phase 3 hybrid (recall-focused)
 
 1. **Same ingest**: one FAISS index + Qdrant collection; note commit SHA and PDF versions.
-2. **Dense baseline**: `RAG_HYBRID_ENABLED=false`, fixed `RAG_TOP_K`, pools irrelevant.
+2. **Dense baseline**: explicitly `RAG_HYBRID_ENABLED=false`, fixed `RAG_TOP_K`, pools irrelevant (hybrid is otherwise **on by default** in app settings).
 3. **Hybrid run**: `RAG_HYBRID_ENABLED=true`; keep `RAG_TOP_K` identical for a fair comparison.
 
 Each report now embeds a **`retrieval_config`** block (JSON and Markdown) plus per-row **`dual_retrieval_notes`** and **`rag_hybrid_enabled`**. Use that to prove runs were configured as intended. **`faiss_store_basename`** is the directory leaf name only so shared reports do not expose absolute paths; set **`RAG_EVAL_SNAPSHOT_INCLUDE_ABSOLUTE_PATHS=true`** only for private debugging.
+
+Keep **`RAG_SEMANTIC_CACHE_ENABLED=false`** (and often **`RAG_MULTI_HOP_ENABLED=false`**) when you need strict per-row retrieval for RAGAS. **`rag-pdf-eval --disable-phase4`** applies the same override for one eval run without editing `.env`.
 
 ### Tuning hybrid toward higher context recall
 

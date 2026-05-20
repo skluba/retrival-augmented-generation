@@ -7,7 +7,7 @@ Starter stack for a **Gemini-first PDF RAG** proof of concept:
 - **LLM**: Gemini 2.0 Flash via **Vertex AI** and the official `**google-genai`** SDK (Application Default Credentials; no Gemini API keys).
 - **API / UI**: **Streamlit** (`rag_pdf_app`).
 - **Vector stores**: **FAISS** (bundled library, on-disk/index in `./data`), **Qdrant** (container).
-- **RAG**: **LangChain** plus **Langfuse** (self-hosted traces) and **RAGAS** (evaluation tooling in code).
+- **RAG**: **LangChain** plus **Langfuse** (self-hosted traces) and **RAGAS** (evaluation tooling in code); **Phase 3** hybrid retrieval (BM25 + dense RRF) and **Phase 4** semantic answer cache plus LLM-guided multi-hop are **on by default** (opt out via `.env`).
 - **PDFs**: **Docling**, **PyMuPDF**, multimodal Gemini flow to be layered on top.
 - **Quality**: **SonarQube** (Compose) + CI with **pre-commit (ruff)**, **pytest**, and optional Sonar scanner.
 
@@ -34,6 +34,8 @@ docker compose --profile core --profile obs up --build -d
 docker compose --profile core --profile quality up --build -d
 docker compose --profile core --profile obs --profile quality up --build -d
 ```
+
+`rag-app` declares **`USER app`** in the image (Sonar-friendly non-root default). **`docker-compose.yml` sets `user: "0:0"`** so the entrypoint can `chown` `/app/data` on the named volume, then **`runuser`** starts Streamlit as **`app` (UID/GID 1000)**. For plain `docker run` with the same volume pattern, pass **`--user 0:0`** once so that bootstrap runs; omit it only if `/app/data` is already writable by UID 1000.
 
 Without `COMPOSE_PROFILES` **and** without `--profile`, no profiled containers start—which is deliberate.
 
@@ -111,6 +113,10 @@ After **Phase 1** ingestion built `FAISS_STORE_PATH` and populated Qdrant, evalu
 
 Reports include **`retrieval_config`** (hybrid on/off, pools, RRF weights, page filters, **FAISS directory basename only**) so you can diff **baseline vs Phase 3** runs without leaking host paths. See **`docs/eval/README.md`** for a recall-first tuning checklist (watch **context_recall** when tuning hybrid).
 
+For strict labeled benchmarks where every row must retrieve fresh context (no similarity-cache shortcuts), set **`RAG_SEMANTIC_CACHE_ENABLED=false`** and typically **`RAG_MULTI_HOP_ENABLED=false`**, or pass **`rag-pdf-eval --disable-phase4`** once without editing `.env`.
+
+Otherwise **`rag-pdf-eval`** uses the same **`Settings`** as Streamlit (Phase 3 hybrid + Phase 4 **on by default**; opt out in `.env` as above).
+
 The CLI runs the same Phase 1 pipeline as Streamlit (dual retrieval → Gemini answer), scores outputs with **RAGAS** (faithfulness, answer relevancy, context precision vs reference answer, context recall), then applies an optional **Gemini judge** rubric on rows whose `Context_Content_Type` suggests tables, figures, or composite evidence.
 
 ```bash
@@ -119,6 +125,9 @@ uv run rag-pdf-eval
 
 # Smoke subset + custom output path
 uv run rag-pdf-eval --max-rows 3 --output-json ./reports/eval/smoke.json
+
+# Strict eval: no semantic-cache hits, no multi-hop (single retrieval path per row)
+uv run rag-pdf-eval --disable-phase4
 
 # Skip judge; judge every row; Markdown only as JSON sidecar
 uv run rag-pdf-eval --skip-judge
@@ -132,18 +141,18 @@ Run this **after each pipeline phase** you care about (e.g. after re-ingesting w
 
 ### Phase 3 · Hybrid retrieval & re-ranking (FAISS leg)
 
-Phase 3 improves **FAISS** context selection (the **Qdrant** path stays dense-only for now). It is **off by default** so Phase 1 behaviour is unchanged until you opt in.
+Phase 3 improves **FAISS** context selection (the **Qdrant** path stays dense-only for now). It is **on by default** (BM25 + dense fused via RRF). Set **`RAG_HYBRID_ENABLED=false`** for dense-only Phase 1 behaviour.
 
 - **Sparse + dense hybrid**: an on-disk **BM25** index is built from the FAISS docstore and fused with dense neighbours via **reciprocal rank fusion (RRF)** with configurable leg weights (`rag_pdf_app/rag/sparse_bm25.py`, `hybrid_fusion.py`, `hybrid_retrieve.py`). For recall-first setups, increase **`RAG_RRF_SPARSE_WEIGHT`** slightly after widening **`RAG_HYBRID_*_POOL`** (see `docs/eval/README.md`).
 - **Metadata**: chunks gain coarse **`content_type`** and **`section_hint`** during ingestion (`chunk_metadata.py`, `chunking.py`). Context headers in the UI include `content_type`.
 - **Constraints**: optional **PDF page windows** come from env (`RAG_PAGE_FILTER_MIN` / `RAG_PAGE_FILTER_MAX`, 1-based inclusive) and/or inline queries such as `pages 10-20` (`query_page_window.py`, fused in `retrieve.py`).
 - **Re-ranking**: after fusion, candidates get a light **metadata overlap boost**, then an optional **cross-encoder** pass if you install the **`phase3`** extra (`rerank_phase3.py`). There is no LLM-as-judge or graph re-ranker in-tree yet.
 
-Enable hybrid retrieval:
+Hybrid retrieval is **on by default**. To use dense-only Phase 1 behaviour:
 
 ```bash
 # In .env — see .env.example for the full list
-RAG_HYBRID_ENABLED=true
+RAG_HYBRID_ENABLED=false
 ```
 
 Cross-encoder (pulls in PyTorch / `sentence-transformers`; omit if you only want BM25+dense RRF):
@@ -154,6 +163,20 @@ uv sync --frozen --extra dev --extra phase3 --python 3.12
 ```
 
 **Re-ingest** PDFs after upgrading Phase 3 chunk metadata if you want `content_type` / `section_hint` populated on every chunk in existing indexes.
+
+### Phase 4 · Semantic cache & multi-hop retrieval
+
+Phase 4 modules (`semantic_cache.py`, `multi_hop.py`) are **on by default**. Set **`RAG_SEMANTIC_CACHE_ENABLED=false`** and/or **`RAG_MULTI_HOP_ENABLED=false`** to disable them, or use **`rag-pdf-eval --disable-phase4`** for a single strict eval run.
+
+- **Semantic cache**: embed the retrieval query (same string as dense retrieval after stripping inline page windows). On cosine similarity ≥ **`RAG_SEMANTIC_CACHE_SIMILARITY_THRESHOLD`** vs any cached embedding, return the stored answer and skip retrieval/generation. **Disabled** whenever inline `pages X–Y` clauses or **`RAG_PAGE_FILTER_*`** apply. **`RAG_SEMANTIC_CACHE_PATH`** is a template: if it ends with `.json`, actual files are `${stem}_${digest}.json` in the same directory for each **resolved FAISS directory + Qdrant collection** pair (no cross-corpus hits); otherwise it is a directory and files are `semantic_cache_${digest}.json` inside it (default template `./data/semantic_rag_cache.json`, under gitignored `./data`). **Shared hosts:** if multiple tenants reuse the same FAISS path and collection, or overwrite one index with different PDFs, cache entries can still mix—set **`RAG_SEMANTIC_CACHE_ENABLED=false`** or give each tenant isolated store paths / processes.
+- **Multi-hop retrieval**: after the first dual retrieval, Gemini emits either **`DONE`** or one short follow-up query; a second **`retrieve_dual`** runs and **FAISS** hits are merged by `chunk_id` (Qdrant stays the first pass for side-by-side latency in the UI).
+
+```bash
+# In .env — see .env.example (defaults are on; uncomment to opt out)
+# RAG_SEMANTIC_CACHE_ENABLED=false
+# RAG_SEMANTIC_CACHE_SIMILARITY_THRESHOLD=0.92
+# RAG_MULTI_HOP_ENABLED=false
+```
 
 ---
 

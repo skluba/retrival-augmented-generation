@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     langfuse_host: str = "http://localhost:3000"
 
     rag_hybrid_enabled: bool = Field(
-        default=False,
+        default=True,
         validation_alias=AliasChoices("RAG_HYBRID_ENABLED"),
     )
     rag_hybrid_dense_pool: int = Field(
@@ -130,6 +130,41 @@ class Settings(BaseSettings):
             "If true, embed resolved absolute FAISS directory in eval retrieval_config "
             "(avoid when sharing reports)."
         ),
+    )
+
+    # Phase 4 · Semantic answer cache (embedding similarity; disabled with page-window filters).
+    rag_semantic_cache_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("RAG_SEMANTIC_CACHE_ENABLED"),
+        description=(
+            "Answer cache keyed by query embedding; files are partitioned by resolved FAISS store "
+            "path and Qdrant collection. On shared Streamlit workers, reuse of the same paths "
+            "across different uploads still shares one cache—disable for strict multi-tenant "
+            "hosts or isolate indices per tenant."
+        ),
+    )
+    rag_semantic_cache_path: str = Field(
+        default="./data/semantic_rag_cache.json",
+        validation_alias=AliasChoices("RAG_SEMANTIC_CACHE_PATH"),
+    )
+    rag_semantic_cache_similarity_threshold: float = Field(
+        default=0.92,
+        ge=0.5,
+        le=1.0,
+        validation_alias=AliasChoices("RAG_SEMANTIC_CACHE_SIMILARITY_THRESHOLD"),
+        description="Cosine similarity minimum vs cached query embeddings to reuse an answer.",
+    )
+    rag_semantic_cache_max_entries: int = Field(
+        default=256,
+        ge=16,
+        le=10_000,
+        validation_alias=AliasChoices("RAG_SEMANTIC_CACHE_MAX_ENTRIES"),
+    )
+
+    rag_multi_hop_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("RAG_MULTI_HOP_ENABLED"),
+        description="Second retrieval pass using an LLM-suggested follow-up query (FAISS merge).",
     )
 
 
