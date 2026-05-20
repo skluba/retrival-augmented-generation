@@ -39,10 +39,7 @@ def _scan_needles(blob: str) -> bool:
             if i == -1:
                 break
             tail = blob[i + nl : i + nl + 24]
-            if (
-                not _preceded_by_word_char(blob, i)
-                and _has_digit_after_punctuation(tail)
-            ):
+            if not _preceded_by_word_char(blob, i) and _has_digit_after_punctuation(tail):
                 return True
             start = i + nl
     return False
@@ -60,11 +57,7 @@ def _scan_compact_glue(blob: str) -> bool:
                 break
             nxt = blob[i + cl : i + cl + 4]
             start = i + cl
-            if (
-                not _preceded_by_word_char(blob, i)
-                and bool(nxt)
-                and nxt[0].isdigit()
-            ):
+            if not _preceded_by_word_char(blob, i) and bool(nxt) and nxt[0].isdigit():
                 return True
     return False
 

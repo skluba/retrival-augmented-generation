@@ -206,13 +206,15 @@ def _enrich_images(
     kept: list[ImageBlock] = []
     for img in images_blocks:
         _apply_image_neighbors(img, layout_spines, spans_by_id)
-        if settings.rag_image_require_figure_label_nearby and not nearby_text_has_explicit_figure_label(
-            img.contextual_snippet_above,
-            img.contextual_snippet_below,
-        ):
-            notes.append(
-                f"img_dropped_no_figure_cue:xref={img.xref}:page={img.page_index + 1}"
+        drop_without_figure_cue = (
+            settings.rag_image_require_figure_label_nearby
+            and not nearby_text_has_explicit_figure_label(
+                img.contextual_snippet_above,
+                img.contextual_snippet_below,
             )
+        )
+        if drop_without_figure_cue:
+            notes.append(f"img_dropped_no_figure_cue:xref={img.xref}:page={img.page_index + 1}")
             continue
         _caption_image_if_enabled(
             img,
