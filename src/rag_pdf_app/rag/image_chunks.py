@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 
+from rag_pdf_app.parsing.figure_cues import nearby_text_has_explicit_figure_label
 from rag_pdf_app.parsing.models import BBox, ImageBlock, ParsedPdf
 from rag_pdf_app.rag.models import TextChunk
 
@@ -74,6 +75,7 @@ def image_text_chunk_from_block(
     source: str,
     min_area_px: int,
     max_text_chars: int = 12_000,
+    require_figure_label_nearby: bool = False,
 ) -> TextChunk | None:
     """Build one searchable chunk for an :class:`ImageBlock`, or ``None`` if skipped."""
 
@@ -81,6 +83,12 @@ def image_text_chunk_from_block(
     caption = (img.caption or "").strip()
     above = (img.contextual_snippet_above or "").strip()
     below = (img.contextual_snippet_below or "").strip()
+
+    if require_figure_label_nearby and not nearby_text_has_explicit_figure_label(
+        above, below, caption
+    ):
+        return None
+
     # Avoid indexing boilerplate-only blobs: large figures without captions/snippets dominated
     # dense/BM25 pools with repeated generic text and diluted eval retrieval (Phase 5.2).
     if not _should_index_image(
@@ -118,6 +126,7 @@ def image_text_chunks_from_parsed_pdf(
     *,
     min_area_px: int,
     max_text_chars: int = 12_000,
+    require_figure_label_nearby: bool = False,
 ) -> list[TextChunk]:
     """Materialise at most one chunk per extracted image that passes the filter."""
 
@@ -129,6 +138,7 @@ def image_text_chunks_from_parsed_pdf(
             source=parsed.filename,
             min_area_px=min_area_px,
             max_text_chars=max_text_chars,
+            require_figure_label_nearby=require_figure_label_nearby,
         )
         if ch is not None:
             out.append(ch)

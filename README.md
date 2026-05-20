@@ -206,11 +206,14 @@ Tiny icons are skipped when their pixel area is below **`RAG_IMAGE_INDEX_MIN_ARE
 
 **Indexing rule:** an image chunk is emitted only when Gemini produced a **caption** and/or **contextual snippets** above/below the figure exist—pure boilerplate blobs are omitted so they cannot crowd out narrative/table retrieval.
 
+**Raster vs real figure:** PyMuPDF surfaces every embedded bitmap (logos, rules, artefacts). **`RAG_IMAGE_REQUIRE_FIGURE_LABEL_NEARBY=true`** (default) keeps only rasters whose nearby extracted text mentions a numbered line such as **`Figure 3`** or **`Fig. 2`**, matching IFC-style reports and avoiding Gemini captions that latch onto unrelated section headings (“Independent auditor’s report”, …). Set it to **`false`** for PDFs that use charts **without** a `Figure N` label.
+
 ```bash
 # In .env — see .env.example
 # RAG_IMAGE_INDEXING_ENABLED=false
 # RAG_INGEST_GEMINI_IMAGE_CAPTIONS=false
 # RAG_IMAGE_INDEX_MIN_AREA_PX=4096
+# RAG_IMAGE_REQUIRE_FIGURE_LABEL_NEARBY=false
 ```
 
 ---

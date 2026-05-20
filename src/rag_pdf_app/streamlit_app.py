@@ -227,8 +227,10 @@ else:
         st.markdown(
             "**Provide the PDF via upload** (normal flow). Ingest runs once (Vertex embeddings → "
             "**FAISS** on disk + **Qdrant**). **Phase 5.1** adds **table chunks**; **Phase 5.2** "
-            "adds **figure / chart chunks** from Gemini image captions plus nearby PDF text (see "
-            "`.env`). "
+            "adds **figure / chart chunks** from Gemini image captions plus nearby PDF text. "
+            "By default (`RAG_IMAGE_REQUIRE_FIGURE_LABEL_NEARBY`, see `.env`) only rasters with a "
+            "nearby **`Figure N` / `Fig. N`** line are indexed—fewer bogus “images” beside plain "
+            "headings."
             "Each question retrieves on **both** backends; Gemini answers use **FAISS** hits. "
             "\n\n**Phase 4 (`.env`, on by default):** `RAG_SEMANTIC_CACHE_ENABLED` reuses answers "
             "for similar questions (skipped when using page-window filters). "

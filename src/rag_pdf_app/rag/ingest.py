@@ -86,6 +86,7 @@ def ingest_pdf_bytes_to_indexes(
         ichunks = image_text_chunks_from_parsed_pdf(
             parsed,
             min_area_px=settings.rag_image_index_min_area_px,
+            require_figure_label_nearby=settings.rag_image_require_figure_label_nearby,
         )
         chunks, img_merge = merge_narrative_and_table_chunks(chunks, ichunks)
         notes.append(f"image_index_merge:{img_merge}")

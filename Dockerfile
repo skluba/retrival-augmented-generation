@@ -52,8 +52,11 @@ RUN uv sync --frozen --no-build --no-install-project --python 3.12 \
     && chown -R app:app /app/.venv \
     && chown app:app /app
 
+# Prefer `/app/src` ahead of `.venv/site-packages` so `import rag_pdf_app` always loads the COPY'd
+# tree (avoids stale wheels when incremental image layers reused an older `rag_pdf_app` install).
 ENV PATH="/app/.venv/bin:$PATH" \
     VIRTUAL_ENV="/app/.venv" \
+    PYTHONPATH="/app/src" \
     PYTHONUNBUFFERED=1 \
     STREAMLIT_BROWSER_GATHER_USAGE_STATS=false \
     PYTHONDONTWRITEBYTECODE=1

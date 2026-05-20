@@ -220,6 +220,15 @@ class Settings(BaseSettings):
             "Skip raster images smaller than width×height area unless they carry caption/text cues."
         ),
     )
+    rag_image_require_figure_label_nearby: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("RAG_IMAGE_REQUIRE_FIGURE_LABEL_NEARBY"),
+        description=(
+            "Drop embedded rasters unless nearby PDF text names a numbered figure ('Figure 3', "
+            "'Fig. 2', …). Reduces captions for logos or layout sprites paired with unrelated "
+            "section titles (annual-report IFC layout)."
+        ),
+    )
 
 
 @lru_cache

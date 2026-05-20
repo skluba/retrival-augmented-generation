@@ -88,3 +88,35 @@ def test_image_chunk_snippets_only_large_figure() -> None:
     chunks = image_text_chunks_from_parsed_pdf(parsed, min_area_px=8192)
     assert len(chunks) == 1
     assert "YoY growth" in chunks[0].text
+
+
+def test_figure_label_gate_skips_auditor_heading_context() -> None:
+    noisy = ImageBlock(
+        xref=99,
+        page_index=57,
+        bbox=BBox(page_index=57, x0=50.0, y0=200.0, x1=200.0, y1=400.0),
+        width_px=200,
+        height_px=300,
+        caption="Decorative flourish next to typography.",
+        contextual_snippet_above="INDEPENDENT AUDITOR'S REPORT",
+        contextual_snippet_below="Financial statements annex",
+    )
+    parsed = ParsedPdf(filename="r.pdf", pdf_bytes_sha256="b2" * 32, images=[noisy])
+    assert (
+        image_text_chunks_from_parsed_pdf(
+            parsed,
+            min_area_px=100,
+            require_figure_label_nearby=True,
+        )
+        == []
+    )
+
+
+def test_figure_label_gate_keeps_explicit_figure_line() -> None:
+    parsed = ParsedPdf(filename="r.pdf", pdf_bytes_sha256="c" * 64, images=[_img()])
+    chunks = image_text_chunks_from_parsed_pdf(
+        parsed,
+        min_area_px=1000,
+        require_figure_label_nearby=True,
+    )
+    assert len(chunks) == 1

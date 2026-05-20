@@ -45,6 +45,7 @@ def eval_retrieval_config_snapshot(settings: Settings) -> dict[str, Any]:
         "rag_plotting_enabled": settings.rag_plotting_enabled,
         "rag_image_indexing_enabled": settings.rag_image_indexing_enabled,
         "rag_ingest_gemini_image_captions": settings.rag_ingest_gemini_image_captions,
+        "rag_image_require_figure_label_nearby": settings.rag_image_require_figure_label_nearby,
     }
     if settings.rag_eval_snapshot_include_absolute_paths:
         snap["faiss_store_path_absolute"] = str(Path(faiss_path).expanduser().resolve())
