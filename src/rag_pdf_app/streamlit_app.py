@@ -7,25 +7,18 @@ import os
 import streamlit as st
 from google.auth.exceptions import DefaultCredentialsError
 
+from rag_pdf_app import streamlit_ui_copy as uic
 from rag_pdf_app.config import Settings, clear_settings_cache, get_settings
 
-st.set_page_config(page_title="PDF RAG Lab", layout="wide")
-st.title("PDF RAG workspace")
-st.caption("Gemini · Vertex AI · hybrid retrieval (FAISS + Qdrant) · tables · figure captions")
+st.set_page_config(page_title=uic.PAGE_TITLE, layout="wide")
+st.title(uic.TITLE)
+st.caption(uic.CAPTION_MAIN)
 
 
 with st.sidebar:
-    st.markdown("### Environment")
-    st.code(
-        (
-            "Use GCP Application Default Credentials — no Gemini API keys.\n"
-            "Host: `gcloud auth application-default login`\n"
-            "Docker Compose: mount host ADC (see docker-compose `GCP_ADC_HOST_PATH`) "
-            "and GOOGLE_APPLICATION_CREDENTIALS, or mount a service-account JSON."
-        ),
-        language="text",
-    )
-    if st.button("Reload `.env` / env"):
+    st.markdown(uic.SIDEBAR_ENV_MARKDOWN_HEADING)
+    st.code(uic.SIDEBAR_ADC_INSTRUCTIONS_TEXT, language="text")
+    if st.button(uic.SIDEBAR_RELOAD_ENV_BUTTON):
         clear_settings_cache()
         st.rerun()
 
@@ -34,15 +27,13 @@ settings_obj: Settings | None = None
 try:
     settings_obj = get_settings()
 except Exception as exc:  # noqa: BLE001
-    st.error("Missing or invalid environment configuration.")
+    st.error(uic.ERR_SETTINGS_LOAD)
     st.exception(exc)
 else:
-    overview_tab, rag_tab, phase6_tab = st.tabs(
-        ["Overview", "Ingest & query (RAG)", "Phase 6 (visual patches)"]
-    )
+    overview_tab, rag_tab, phase6_tab = st.tabs(list(uic.TAB_LABELS))
 
     with overview_tab:
-        st.success("Loaded settings from environment.")
+        st.success(uic.OVERVIEW_SUCCESS)
         st.json(
             {
                 "GOOGLE_CLOUD_PROJECT": settings_obj.google_cloud_project,
@@ -61,32 +52,21 @@ else:
             }
         )
 
-        if st.checkbox("Smoke test Gemini (calls Vertex AI)"):
+        if st.checkbox(uic.OVERVIEW_SMOKE_CHECKBOX_LABEL):
             from rag_pdf_app.vertex_gemini import generate_plain_text
 
-            prompt = st.text_area("Prompt", value="Respond with exactly: pong")
-            if st.button("Run Gemini text"):
-                with st.spinner("Calling Gemini…"):
+            prompt = st.text_area(uic.OVERVIEW_PROMPT_LABEL, value=uic.OVERVIEW_PROMPT_DEFAULT)
+            if st.button(uic.OVERVIEW_GEMINI_RUN_BUTTON):
+                with st.spinner(uic.OVERVIEW_GEMINI_SPINNER):
                     try:
                         out = generate_plain_text(prompt, settings_obj)
                     except DefaultCredentialsError as cred_exc:
-                        st.error(
-                            "Google credentials are not available **inside this process**. "
-                            "On the host, run `gcloud auth application-default login`. "
-                            "In **Docker**, mount that JSON and set "
-                            "`GOOGLE_APPLICATION_CREDENTIALS` "
-                            "(see `docker-compose.yml` for `GCP_ADC_HOST_PATH`)."
-                        )
+                        st.error(uic.OVERVIEW_GEMINI_CREDENTIAL_ERROR)
                         st.exception(cred_exc)
                     else:
                         st.write(out)
 
-        st.markdown(
-            "Upload a PDF, index **FAISS + Qdrant**, and ask questions in "
-            "**Ingest & query (RAG)** — hybrid retrieval (dense + BM25), structured **table** "
-            "chunks, **figure** caption chunks, optional semantic cache and multi-hop "
-            "(see `.env`)."
-        )
+        st.markdown(uic.OVERVIEW_FOOTNOTE_MARKDOWN)
 
     with rag_tab:
         from rag_pdf_app.rag.embeddings import vertex_text_embeddings
@@ -95,37 +75,25 @@ else:
         from rag_pdf_app.rag.stores import load_faiss_index
         from rag_pdf_app.rag.table_plot import chartable_numeric_frame, dataframe_from_hits
 
-        st.subheader("Baseline RAG — text, tables (5.1), and figure captions (5.2)")
-        st.markdown(
-            "**Provide the PDF via upload** (normal flow). Ingest runs once (Vertex embeddings → "
-            "**FAISS** on disk + **Qdrant**). **Phase 5.1** adds **table chunks**; **Phase 5.2** "
-            "adds **figure / chart chunks** from Gemini image captions plus nearby PDF text. "
-            "By default (`RAG_IMAGE_REQUIRE_FIGURE_LABEL_NEARBY`, see `.env`) only rasters with a "
-            "nearby **`Figure N` / `Fig. N`** line are indexed—fewer bogus “images” beside plain "
-            "headings. "
-            "Each question retrieves on **both** backends; Gemini answers use **FAISS** hits. "
-            "\n\n**Phase 4 (`.env`, on by default):** `RAG_SEMANTIC_CACHE_ENABLED` reuses answers "
-            "for similar questions (skipped when using page-window filters). "
-            "`RAG_MULTI_HOP_ENABLED` runs a second retrieval pass after an LLM-suggested query. "
-            "Set either to `false` to disable."
-        )
+        st.subheader(uic.RAG_SUBHEADER)
+        st.markdown(uic.RAG_INTRO_MARKDOWN)
 
         upload_rag = st.file_uploader(
-            "Upload PDF",
+            uic.RAG_UPLOAD_LABEL,
             type=["pdf"],
             key="rag_pdf_upload",
-            help="Preferred: choose the annual report (or any text PDF) from your machine.",
+            help=uic.RAG_UPLOAD_HELP,
         )
 
-        layout_chunks = st.checkbox("Structure-aware chunking (pdfminer)", value=True)
+        layout_chunks = st.checkbox(uic.RAG_LAYOUT_CHUNKS_CHECKBOX, value=True)
         col_a, col_b = st.columns(2)
         with col_a:
-            if st.button("Ingest & index", type="primary"):
+            if st.button(uic.RAG_INGEST_BUTTON, type="primary"):
                 try:
                     if upload_rag is not None:
                         raw_pdf = upload_rag.getvalue()
                         name = upload_rag.name
-                        with st.spinner("Embedding + FAISS + Qdrant…"):
+                        with st.spinner(uic.RAG_INGEST_SPINNER):
                             outcome = ingest_pdf_bytes_to_indexes(
                                 settings_obj,
                                 raw_pdf,
@@ -133,45 +101,45 @@ else:
                                 use_layout_chunking=layout_chunks,
                             )
                     else:
-                        st.warning("Upload a PDF above to ingest.")
+                        st.warning(uic.RAG_INGEST_UPLOAD_WARN)
                         outcome = None
                     if outcome:
                         emb = vertex_text_embeddings(settings_obj)
                         st.session_state["phase1_faiss"] = load_faiss_index(emb, settings_obj)
                         st.session_state["phase1_ingest_meta"] = outcome
                         st.success(
-                            f"Indexed **{outcome.chunk_count}** chunks · "
-                            f"{outcome.embedding_dimensions}d · "
-                            f"FAISS `{outcome.faiss_path}` · "
-                            f"Qdrant `{outcome.qdrant_collection}`"
+                            uic.RAG_INGEST_SUCCESS_TEMPLATE.format(
+                                chunk_count=outcome.chunk_count,
+                                embedding_dimensions=outcome.embedding_dimensions,
+                                faiss_path=outcome.faiss_path,
+                                qdrant_collection=outcome.qdrant_collection,
+                            )
                         )
                         if outcome.notes:
-                            with st.expander("Ingest notes"):
+                            with st.expander(uic.RAG_EXPANDER_INGEST_NOTES):
                                 for n in outcome.notes:
                                     st.markdown(f"- `{n}`")
                 except Exception as exc:  # noqa: BLE001 — surface stack in lab UI
-                    st.error("Ingest failed (Vertex, Qdrant reachability, or empty PDF).")
+                    st.error(uic.RAG_ERR_INGEST)
                     st.exception(exc)
 
         with col_b:
-            if st.button("Reload FAISS from disk"):
+            if st.button(uic.RAG_RELOAD_FAISS_BUTTON):
                 try:
                     emb = vertex_text_embeddings(settings_obj)
                     st.session_state["phase1_faiss"] = load_faiss_index(emb, settings_obj)
-                    st.success(
-                        "Loaded FAISS index — ensure Qdrant already has the same collection."
-                    )
+                    st.success(uic.RAG_RELOAD_FAISS_SUCCESS)
                 except Exception as exc:  # noqa: BLE001
-                    st.error("Could not load FAISS store.")
+                    st.error(uic.RAG_ERR_FAISS_LOAD)
                     st.exception(exc)
 
         faiss_store = st.session_state.get("phase1_faiss")
         if faiss_store is None:
-            st.info("Upload a PDF and run **Ingest & index**, or reload FAISS from disk to query.")
+            st.info(uic.RAG_INFO_UPLOAD_OR_RELOAD_FAISS)
         else:
-            q_text = st.text_area("Question about the report", height=100)
-            if st.button("Ask (retrieve + Gemini)", disabled=not q_text.strip()):
-                with st.spinner("Retrieving + generating…"):
+            q_text = st.text_area(uic.RAG_QUESTION_LABEL, height=100)
+            if st.button(uic.RAG_ASK_BUTTON, disabled=not q_text.strip()):
+                with st.spinner(uic.RAG_QUERY_SPINNER):
                     try:
                         result = run_phase1_rag(
                             settings_obj,
@@ -179,10 +147,10 @@ else:
                             faiss_store=faiss_store,
                         )
                     except Exception as exc:  # noqa: BLE001
-                        st.error("RAG query failed.")
+                        st.error(uic.RAG_ERR_QUERY)
                         st.exception(exc)
                     else:
-                        st.markdown("### Answer")
+                        st.markdown(uic.RAG_MARKDOWN_HEADING_ANSWER)
                         st.write(result.answer)
                         if not result.semantic_cache_hit and settings_obj.rag_plotting_enabled:
                             df_plot, plot_note = dataframe_from_hits(
@@ -190,110 +158,78 @@ else:
                                 settings_obj,
                             )
                             if df_plot is not None:
-                                st.subheader("Chart · retrieved table preview")
+                                st.subheader(uic.RAG_CHART_SUBHEADER)
                                 st.dataframe(df_plot.head(80), use_container_width=True)
                                 num_df = chartable_numeric_frame(df_plot)
                                 if not num_df.empty:
                                     st.bar_chart(num_df.head(40))
                                 else:
-                                    st.caption(
-                                        "Numeric chart skipped — no numeric columns detected "
-                                        "(table still shown above)."
-                                    )
+                                    st.caption(uic.RAG_CAPTION_CHART_SKIP_NUMERIC)
                             else:
                                 st.caption(
-                                    "Plotting: no CSV-backed table in top FAISS hits "
-                                    f"({plot_note})."
+                                    uic.RAG_CAPTION_NO_CSV_PREVIEW_TEMPLATE.format(plot_note=plot_note)
                                 )
                         if result.semantic_cache_hit:
-                            st.success(
-                                "Semantic cache hit — similar prior query (see retrieval notes)."
-                            )
+                            st.success(uic.RAG_SUCCESS_SEMANTIC_CACHE)
                             if result.semantic_cache_similarity is not None:
                                 sim = result.semantic_cache_similarity
-                                st.caption(f"Cache cosine similarity ≈ **{sim:.3f}**")
+                                st.caption(uic.RAG_CAPTION_SEMANTIC_SIM_TEMPLATE.format(sim=sim))
                         if result.multi_hop_used:
-                            st.info("Multi-hop retrieval merged a second FAISS pass into context.")
-                        st.caption(
-                            f"Langfuse trace: **{'yes' if result.langfuse_traced else 'no'}** "
-                            "(needs `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`)."
+                            st.info(uic.RAG_INFO_MULTI_HOP)
+                        traced = (
+                            uic.RAG_LANGFUSE_YES
+                            if result.langfuse_traced
+                            else uic.RAG_LANGFUSE_NO
                         )
+                        st.caption(uic.RAG_CAPTION_LANGFUSE_TEMPLATE.format(traced_label=traced))
 
                         r = result.retrieval
                         c1, c2 = st.columns(2)
                         with c1:
-                            st.metric("FAISS retrieval ms", f"{r.faiss_timing.latency_ms:.2f}")
+                            st.metric(
+                                uic.RAG_METRIC_FAISS_LABEL,
+                                f"{r.faiss_timing.latency_ms:.2f}",
+                            )
                             st.caption(r.faiss_timing.metric)
                             for h in r.faiss_hits:
-                                kind = h.metadata.get("chunk_kind", "narrative")
-                                title = f"FAISS · {kind} · {h.chunk_id[:12]}… · score {h.score:.4f}"
+                                kind = h.metadata.get("chunk_kind", uic.DEFAULT_CHUNK_KIND)
+                                title = uic.RAG_FAISS_HIT_EXPANDER_TEMPLATE.format(
+                                    kind=kind,
+                                    chunk_prefix=uic.rag_faiss_hit_chunk_prefix(h.chunk_id),
+                                    score=h.score,
+                                )
                                 with st.expander(title):
-                                    st.text(h.text[:2000])
+                                    st.text(h.text[: uic.RAG_HIT_TEXT_PREVIEW_CHARS])
                         with c2:
-                            st.metric("Qdrant retrieval ms", f"{r.qdrant_timing.latency_ms:.2f}")
+                            st.metric(
+                                uic.RAG_METRIC_QDRANT_LABEL,
+                                f"{r.qdrant_timing.latency_ms:.2f}",
+                            )
                             st.caption(r.qdrant_timing.metric)
                             for h in r.qdrant_hits:
-                                with st.expander(
-                                    f"Qdrant · {h.chunk_id[:12]}… · score {h.score:.4f}"
-                                ):
-                                    st.text(h.text[:2000])
+                                title = uic.RAG_QDRANT_HIT_EXPANDER_TEMPLATE.format(
+                                    chunk_prefix=uic.rag_faiss_hit_chunk_prefix(h.chunk_id),
+                                    score=h.score,
+                                )
+                                with st.expander(title):
+                                    st.text(h.text[: uic.RAG_HIT_TEXT_PREVIEW_CHARS])
 
-                        with st.expander("FAISS vs Qdrant — when to use which"):
-                            st.markdown(
-                                """
-**FAISS (local)** — Best for single-node prototypes, zero network hops after build,
-simple files-on-disk deployment. Weaknesses: no multi-user ACLs, no incremental REST API,
-you manage persistence and backups yourself.
-
-**Qdrant (service)** — HTTP/gRPC API, horizontal scaling, filtering/payload queries,
-multi-collection ops—better when several apps share vectors or you need managed ingestion.
-Adds network latency vs purely local FAISS.
-
-**This lab** keeps both in sync so you can compare raw query latency on identical embeddings;
-scores differ because LangChain FAISS defaults to L2 distance while this Qdrant collection
-uses cosine similarity.
-"""
-                            )
+                        with st.expander(uic.RAG_EXPANDER_FAISS_VS_QDRANT):
+                            st.markdown(uic.RAG_MARKDOWN_FAISS_VS_QDRANT)
 
                         if r.notes:
-                            with st.expander("Score interpretation"):
+                            with st.expander(uic.RAG_EXPANDER_SCORE_INTERPRETATION):
                                 # Plain text: dual_retrieval_notes can contain LLM-derived strings;
                                 # avoid st.markdown so document/markdown injection cannot run here.
                                 st.code("\n".join(r.notes), language=None)
 
-    def _phase6_optional_deps_hint() -> str | None:
-        try:
-            import PIL  # noqa: F401, PLC0415
-        except ImportError:
-            return (
-                "**Pillow** is missing (`pip install pillow` or "
-                "`uv sync --frozen --extra dev --extra phase6`)."
-            )
-        try:
-            import sentence_transformers  # noqa: F401, PLC0415
-        except ImportError:
-            return (
-                "**sentence-transformers** is missing — run "
-                "`uv sync --frozen --extra dev --extra phase6 --python 3.12` (pulls Torch + CLIP)."
-            )
-        return None
-
     with phase6_tab:
-        st.subheader("Phase 6 — visual patches + multilingual CLIP (ColPali-style scaffold)")
-        st.markdown(
-            "Raster PDF pages → **tiling crops** → **Sentence-Transformers CLIP** embeddings in a "
-            "**separate Qdrant collection**. Retrieval uses cosine prefetch plus optional **pseudo "
-            "MaxSim** (reshape pooled vectors into synthetic token rows). Gemini receives **PNG "
-            "crops** rerendered from the PDF for transparency and layout fidelity vs Phase 5.2 "
-            "figure **captions-only** indexing."
-        )
-        miss = _phase6_optional_deps_hint()
+        st.subheader(uic.PHASE6_SUBHEADER)
+        st.markdown(uic.PHASE6_INTRO_MARKDOWN)
+        miss = uic.phase6_optional_deps_hint()
         if miss:
-            st.warning(miss + " Reload Streamlit after install.")
-            st.markdown(
-                "Phase 6 uses `PHASE6_*` env vars — "
-                "see [.env.example](.env.example) and README §Phase 6."
-            )
+            st.warning(miss + uic.PHASE6_RELOAD_AFTER_EXTRA)
+            st.markdown(uic.PHASE6_ENV_MARKDOWN_FALLBACK)
         else:
             import io as _phase6_io
 
@@ -302,30 +238,34 @@ uses cosine similarity.
             from rag_pdf_app.phase6.retrieve_visual import retrieve_phase6_visual_patches
             from rag_pdf_app.rag.stores import qdrant_client
 
-            st.caption(f"Phase 6 Qdrant · `{settings_obj.phase6_qdrant_collection}`")
+            st.caption(
+                uic.PHASE6_QDRANT_CAPTION_TEMPLATE.format(
+                    collection=settings_obj.phase6_qdrant_collection,
+                )
+            )
 
             upload_vis = st.file_uploader(
-                "Upload PDF (Phase 6 · rebuilds Phase 6 collection)",
+                uic.PHASE6_UPLOAD_LABEL,
                 type=["pdf"],
                 key="phase6_pdf_upload",
             )
 
             ingest_col_left, ingest_col_right = st.columns(2)
             with ingest_col_left:
-                if st.button("Ingest Phase 6 (CLIP patches)", type="primary", key="p6_ingest"):
+                if st.button(uic.PHASE6_INGEST_BUTTON, type="primary", key="p6_ingest"):
                     if upload_vis is None:
-                        st.warning("Upload a PDF first.")
+                        st.warning(uic.PHASE6_WARN_UPLOAD_FOR_INGEST)
                     else:
                         raw_vis = upload_vis.getvalue()
                         name_vis = upload_vis.name
-                        with st.spinner("Rasterising patches + CLIP + Qdrant…"):
+                        with st.spinner(uic.PHASE6_INGEST_SPINNER):
                             try:
                                 qdr = qdrant_client(settings_obj)
                                 outcome = ingest_phase6_visual_pdf(
                                     qdr, settings_obj, raw_vis, name_vis
                                 )
                             except Exception as exc:  # noqa: BLE001
-                                st.error("Phase 6 ingest failed (GPU/memory, Pillow, Torch, PDF).")
+                                st.error(uic.PHASE6_ERR_INGEST)
                                 st.exception(exc)
                             else:
                                 st.session_state["phase6_pdf_bytes"] = raw_vis
@@ -333,55 +273,64 @@ uses cosine similarity.
                                 st.session_state["phase6_source_name"] = name_vis
                                 st.session_state["phase6_ingest"] = outcome
                                 st.success(
-                                    f"{outcome.patch_count} patches · "
-                                    f"{outcome.vector_dimension}d · "
-                                    f"Qdrant **`{outcome.qdrant_collection}`** · "
-                                    f"`{outcome.embedding_model_name}`"
+                                    uic.PHASE6_INGEST_SUCCESS_TEMPLATE.format(
+                                        patch_count=outcome.patch_count,
+                                        vector_dimension=outcome.vector_dimension,
+                                        collection=outcome.qdrant_collection,
+                                        embedding_model=outcome.embedding_model_name,
+                                    )
                                 )
                                 if outcome.notes:
-                                    with st.expander("Ingest notes"):
+                                    with st.expander(uic.RAG_EXPANDER_INGEST_NOTES):
                                         st.code("\n".join(outcome.notes), language=None)
 
             with ingest_col_right:
-                if st.button("Forget Phase 6 session PDF", key="p6_clear"):
+                if st.button(uic.PHASE6_FORGET_SESSION_BUTTON, key="p6_clear"):
                     for key in ("phase6_pdf_bytes", "phase6_pdf_sha256", "phase6_source_name"):
                         st.session_state.pop(key, None)
-                    st.success("Phase 6 session PDF cleared.")
+                    st.success(uic.PHASE6_SESSION_CLEARED)
 
             if st.session_state.get("phase6_pdf_bytes"):
                 digest = str(st.session_state.get("phase6_pdf_sha256", ""))
                 digest_disp = digest[:18] + "…" if len(digest) > 18 else (digest or "?")
-                fname = str(st.session_state.get("phase6_source_name") or "upload.pdf")
-                st.caption(
-                    f"In-memory PDF **`{fname}`** · "
-                    f"sha256 `{digest_disp}` (thumbnails + Gemini crops)."
+                raw_name = str(
+                    st.session_state.get("phase6_source_name")
+                    or uic.PHASE6_UPLOAD_DEFAULT_FILENAME
+                )
+                basename_safe = (
+                    os.path.basename(raw_name) or raw_name or uic.PHASE6_UPLOAD_DEFAULT_FILENAME
+                )
+                # Filenames come from browser uploads — never interpolate into Markdown widgets.
+                st.caption(uic.PHASE6_CAPTION_SESSION_READY)
+                st.text(
+                    uic.PHASE6_SESSION_PLAINTEXT_TEMPLATE.format(
+                        basename=basename_safe,
+                        digest_disp=digest_disp,
+                    )
                 )
 
             q_visual = st.text_area(
-                "Question (CLIP retrieval + Gemini over crops)",
+                uic.PHASE6_QUESTION_LABEL,
                 height=96,
                 key="phase6_question",
             )
             rerender_dpi_slider = st.slider(
-                "Rerender DPI for Gemini crops / thumbnails",
+                uic.PHASE6_SLIDER_RERENDER_DPI_LABEL,
                 min_value=int(settings_obj.phase6_render_dpi),
                 max_value=min(216, max(int(settings_obj.phase6_render_dpi), 216)),
                 value=int(settings_obj.phase6_render_dpi),
-                help=(
-                    "Higher DPI improves serif text clarity; ingest raster DPI "
-                    "stays tied to PHASE6_RENDER_DPI."
-                ),
+                help=uic.PHASE6_SLIDER_RERENDER_DPI_HELP,
             )
 
-            if st.button("Retrieve + answer (Gemini multimodal)", key="p6_ask"):
+            if st.button(uic.PHASE6_ASK_BUTTON, key="p6_ask"):
                 pdf_buf_local = st.session_state.get("phase6_pdf_bytes")
                 pdf_digest = str(st.session_state.get("phase6_pdf_sha256") or "").strip()
                 if not pdf_buf_local:
-                    st.warning("Ingest Phase 6 for this PDF first (or re-upload after reload).")
+                    st.warning(uic.PHASE6_WARN_INGEST_FIRST)
                 elif not pdf_digest:
-                    st.warning("Missing PDF digest — run Phase 6 ingest.")
+                    st.warning(uic.PHASE6_WARN_NO_DIGEST)
                 elif not q_visual.strip():
-                    st.warning("Enter a question.")
+                    st.warning(uic.PHASE6_WARN_EMPTY_QUESTION)
                 else:
                     from rag_pdf_app.vertex_gemini import generate_visual_rag_answer_from_patches
 
@@ -390,7 +339,7 @@ uses cosine similarity.
                     telem_local: dict[str, str] = {}
                     thumbs: list[bytes] = []
                     try:
-                        with st.spinner("CLIP retrieve + patch crops…"):
+                        with st.spinner(uic.PHASE6_SPINNER_CLIP_RETRIEVE):
                             hits_local, telem_local = retrieve_phase6_visual_patches(
                                 qdr_local,
                                 settings_obj,
@@ -412,17 +361,13 @@ uses cosine similarity.
                                     )
                                 )
                         if telem_local:
-                            with st.expander("Retrieval telemetry"):
+                            with st.expander(uic.PHASE6_EXPANDER_RETRIEVAL_TELEMETRY):
                                 st.json(telem_local)
 
                         if not hits_local:
-                            st.warning(
-                                "No patches returned — try another question, widen "
-                                "`PHASE6_VISUAL_PREFETCH`, ingest more pages, or lower "
-                                "`PHASE6_PATCH_STRIDE_PX` / `PHASE6_PATCH_SIZE_PX` overlap."
-                            )
+                            st.warning(uic.PHASE6_WARN_NO_PATCHES)
                         else:
-                            with st.spinner("Gemini multimodal answer…"):
+                            with st.spinner(uic.PHASE6_SPINNER_GEMINI):
                                 labelled = [(f"[P{i}]", b) for i, b in enumerate(thumbs, start=1)]
                                 answer_txt = generate_visual_rag_answer_from_patches(
                                     settings_obj,
@@ -430,30 +375,34 @@ uses cosine similarity.
                                     labelled_patch_pngs=labelled,
                                 )
 
-                            st.markdown("### Answer")
+                            st.markdown(uic.PHASE6_MARKDOWN_HEADING_ANSWER)
                             st.write(answer_txt)
 
-                            st.markdown("### Source attribution · rerendered crops")
+                            st.markdown(uic.PHASE6_MARKDOWN_HEADING_SOURCES)
                             for idx, png in enumerate(thumbs, start=1):
                                 hit = hits_local[idx - 1]
                                 pay = hit.payload
                                 pg = int(pay.get("page_index", 0)) + 1
                                 r_ix = pay.get("row_index")
                                 c_ix = pay.get("col_index")
-                                cap = (
-                                    f"**[P{idx}]** · PDF page **`{pg}`** · patch tile "
-                                    f"**r{r_ix}c{c_ix}**"
+                                cap = uic.PHASE6_ATTR_LINE_PREFIX_TEMPLATE.format(
+                                    idx=idx,
+                                    page=pg,
+                                    r_ix=r_ix,
+                                    c_ix=c_ix,
                                 )
                                 if settings_obj.phase6_visual_maxsim_rerank and (
                                     hit.coarse_score is not None
                                     and abs(hit.coarse_score - hit.score) > 1e-6
                                 ):
-                                    cap += (
-                                        " · prefetch cos ≈ "
-                                        f"`{hit.coarse_score:.4f}` · rerank `{hit.score:.4f}`"
+                                    cap += uic.PHASE6_ATTR_SCORE_RERANK_TEMPLATE.format(
+                                        coarse=hit.coarse_score,
+                                        score=hit.score,
                                     )
                                 else:
-                                    cap += f" · score `{hit.score:.4f}`"
+                                    cap += uic.PHASE6_ATTR_SCORE_SIMPLE_TEMPLATE.format(
+                                        score=hit.score,
+                                    )
                                 st.markdown(cap)
                                 st.image(
                                     _phase6_io.BytesIO(png),
@@ -461,20 +410,8 @@ uses cosine similarity.
                                     use_container_width=True,
                                 )
 
-                            with st.expander("Phase 1 vs Phase 6 — what to compare"):
-                                st.markdown(
-                                    """
-**Phase 1 (+ 5.x)** indexes **tokens** — narrative/table JSON, optional **Gemini captions** for
-figures (no vectors over pixels). Answers combine **hybrid textual** snippets only.
-
-**Phase 6** indexes **CLIP patch embeddings** (+ optional pseudo-MaxSim rerank), then sends PNG
-rerenders into Gemini — useful when OCR text is unreliable or visuals carry the semantics, at the
-cost of heavier ingest (Torch) and heuristic layout tiling.
-
-Pose the **same prompt** here and under **Ingest & query (RAG)**—if answers diverge, compare the
-shown crops vs textual passages to diagnose lexical vs spatial evidence mismatch.
-"""
-                                )
+                            with st.expander(uic.PHASE6_EXPANDER_COMPARE_PHASE1):
+                                st.markdown(uic.PHASE6_COMPARE_MARKDOWN)
                     except Exception as exc:  # noqa: BLE001
-                        st.error("Phase 6 query failed.")
+                        st.error(uic.PHASE6_ERR_QUERY)
                         st.exception(exc)
