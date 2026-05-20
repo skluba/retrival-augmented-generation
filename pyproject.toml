@@ -46,6 +46,11 @@ dev = [
 phase3 = [
   "sentence-transformers>=3.0.0",
 ]
+phase6 = [
+  # Multilingual CLIP-aligned queries (sentence-transformers) + HF ViT patch encoding (+ Pillow; Torch).
+  "pillow>=10.4.0",
+  "sentence-transformers>=3.0.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
