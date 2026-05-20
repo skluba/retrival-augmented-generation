@@ -223,11 +223,12 @@ else:
         from rag_pdf_app.rag.stores import load_faiss_index
         from rag_pdf_app.rag.table_plot import chartable_numeric_frame, dataframe_from_hits
 
-        st.subheader("Baseline RAG — IFC Annual Report (text + Phase 5.1 tables)")
+        st.subheader("Baseline RAG — text, tables (5.1), and figure captions (5.2)")
         st.markdown(
             "**Provide the PDF via upload** (normal flow). Ingest runs once (Vertex embeddings → "
-            "**FAISS** on disk + **Qdrant**). **Phase 5.1** adds indexed **table chunks** from "
-            "structured parsing (PyMuPDF; optional Camelot when enabled in `.env`). "
+            "**FAISS** on disk + **Qdrant**). **Phase 5.1** adds **table chunks**; **Phase 5.2** "
+            "adds **figure / chart chunks** from Gemini image captions plus nearby PDF text (see "
+            "`.env`). "
             "Each question retrieves on **both** backends; Gemini answers use **FAISS** hits. "
             "\n\n**Phase 4 (`.env`, on by default):** `RAG_SEMANTIC_CACHE_ENABLED` reuses answers "
             "for similar questions (skipped when using page-window filters). "

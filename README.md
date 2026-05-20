@@ -7,7 +7,7 @@ Starter stack for a **Gemini-first PDF RAG** proof of concept:
 - **LLM**: Gemini 2.0 Flash via **Vertex AI** and the official `**google-genai`** SDK (Application Default Credentials; no Gemini API keys).
 - **API / UI**: **Streamlit** (`rag_pdf_app`).
 - **Vector stores**: **FAISS** (bundled library, on-disk/index in `./data`), **Qdrant** (container).
-- **RAG**: **LangChain** plus **Langfuse** (self-hosted traces) and **RAGAS** (evaluation tooling in code); **Phase 3** hybrid retrieval (BM25 + dense RRF), **Phase 4** semantic answer cache plus LLM-guided multi-hop, and **Phase 5.1** table indexing + table-aware prompting are **on by default** (opt out via `.env`).
+- **RAG**: **LangChain** plus **Langfuse** (self-hosted traces) and **RAGAS** (evaluation tooling in code); **Phase 3** hybrid retrieval (BM25 + dense RRF), **Phase 4** semantic answer cache plus LLM-guided multi-hop, **Phase 5.1** table indexing, and **Phase 5.2** figure-caption indexing are **on by default** (opt out via `.env`).
 - **PDFs**: **Docling**, **PyMuPDF**, multimodal Gemini flow to be layered on top.
 - **Quality**: **SonarQube** (Compose) + CI with **pre-commit (ruff)**, **pytest**, and optional Sonar scanner.
 
@@ -193,6 +193,22 @@ Re-ingest after changing table-related settings so indexes contain (or omit) tab
 # RAG_INGEST_RUN_CAMELOT=true   # trusted PDFs only
 # RAG_INGEST_RUN_DOCLING=false  # faster ingest; less context from Docling
 # RAG_PLOTTING_ENABLED=false
+```
+
+### Phase 5.2 · Multimodal RAG — figures & charts (captions)
+
+When **`RAG_IMAGE_INDEXING_ENABLED=true`** (default), ingest runs the same `parse_pdf_bytes` pass with **embedded image bytes** so **Gemini can caption** figures (`RAG_INGEST_GEMINI_IMAGE_CAPTIONS`, default on). Each accepted raster becomes a `TextChunk` with `chunk_kind=pdf_image`, `content_type=figure_visual`, and searchable text built from the **caption + neighbouring PDF sentences** (parsed alongside the image—not raw pixels stored in FAISS body text).
+
+- **Retrieval**: chunks share the **same** dense + BM25 index as narrative and table rows. Phase 3 metadata boosts nudge chart-like queries toward `pdf_image` / `figure_visual` rows.
+- **Prompting**: when top **FAISS** hits include figure chunks, Gemini is told those passages are **model descriptions** of visuals, not measured pixel data.
+
+Tiny icons are skipped when their pixel area is below **`RAG_IMAGE_INDEX_MIN_AREA_PX`** (default 8192), unless they still carry a caption or contextual snippets.
+
+```bash
+# In .env — see .env.example
+# RAG_IMAGE_INDEXING_ENABLED=false
+# RAG_INGEST_GEMINI_IMAGE_CAPTIONS=false
+# RAG_IMAGE_INDEX_MIN_AREA_PX=4096
 ```
 
 ---

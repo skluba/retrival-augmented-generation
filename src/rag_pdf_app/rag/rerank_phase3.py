@@ -21,8 +21,12 @@ def metadata_boost_rerank(hits: list[RetrievalHit], query: str) -> list[Retrieva
     def bonus(hit: RetrievalHit) -> float:
         b = 0.0
         ct = str(hit.metadata.get("content_type", "")).lower()
+        kind = str(hit.metadata.get("chunk_kind", "")).lower()
         if "figure" in q_low and "figure" in ct:
             b += 1.5
+        visual_q = any(k in q_low for k in ("chart", "graph", "diagram", "plot", "visual", "image"))
+        if visual_q and ("figure" in ct or "visual" in ct or kind == "pdf_image"):
+            b += 1.35
         if "table" in q_low and ("table" in ct or "table_structured" in ct):
             b += 1.5
         sh = str(hit.metadata.get("section_hint") or "").lower()
