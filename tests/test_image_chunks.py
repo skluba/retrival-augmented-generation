@@ -47,6 +47,19 @@ def test_image_chunk_skips_when_tiny_and_empty() -> None:
     assert chunks == []
 
 
+def test_skips_large_image_without_caption_or_snippets() -> None:
+    bare = ImageBlock(
+        xref=9,
+        page_index=3,
+        bbox=BBox(page_index=3, x0=0.0, y0=0.0, x1=300.0, y1=300.0),
+        width_px=300,
+        height_px=300,
+        caption=None,
+    )
+    parsed = ParsedPdf(filename="r.pdf", pdf_bytes_sha256="f" * 64, images=[bare])
+    assert image_text_chunks_from_parsed_pdf(parsed, min_area_px=100) == []
+
+
 def test_image_chunk_keeps_tiny_if_caption_present() -> None:
     tiny_c = ImageBlock(
         xref=2,
@@ -59,3 +72,19 @@ def test_image_chunk_keeps_tiny_if_caption_present() -> None:
     parsed = ParsedPdf(filename="r.pdf", pdf_bytes_sha256="e" * 64, images=[tiny_c])
     chunks = image_text_chunks_from_parsed_pdf(parsed, min_area_px=8192)
     assert len(chunks) == 1
+
+
+def test_image_chunk_snippets_only_large_figure() -> None:
+    img = ImageBlock(
+        xref=11,
+        page_index=4,
+        bbox=BBox(page_index=4, x0=0.0, y0=0.0, x1=200.0, y1=200.0),
+        width_px=200,
+        height_px=200,
+        caption=None,
+        contextual_snippet_above="Chart shows YoY growth.",
+    )
+    parsed = ParsedPdf(filename="r.pdf", pdf_bytes_sha256="a1" * 32, images=[img])
+    chunks = image_text_chunks_from_parsed_pdf(parsed, min_area_px=8192)
+    assert len(chunks) == 1
+    assert "YoY growth" in chunks[0].text

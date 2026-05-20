@@ -204,6 +204,8 @@ When **`RAG_IMAGE_INDEXING_ENABLED=true`** (default), ingest runs the same `pars
 
 Tiny icons are skipped when their pixel area is below **`RAG_IMAGE_INDEX_MIN_AREA_PX`** (default 8192), unless they still carry a caption or contextual snippets.
 
+**Indexing rule:** an image chunk is emitted only when Gemini produced a **caption** and/or **contextual snippets** above/below the figure exist—pure boilerplate blobs are omitted so they cannot crowd out narrative/table retrieval.
+
 ```bash
 # In .env — see .env.example
 # RAG_IMAGE_INDEXING_ENABLED=false

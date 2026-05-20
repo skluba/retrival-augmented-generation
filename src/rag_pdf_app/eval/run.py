@@ -190,6 +190,15 @@ def main(argv: list[str] | None = None) -> int:
             "semantic cache + multi-hop off.",
             flush=True,
         )
+    elif settings.rag_semantic_cache_enabled:
+        print(
+            "WARNING: RAG_SEMANTIC_CACHE_ENABLED is on. Cache hits skip retrieval and yield "
+            "empty FAISS contexts — RAGAS context_precision/context_recall often collapse near "
+            "0. Use `rag-pdf-eval --disable-phase4` (or disable the cache in `.env`) for "
+            "benchmarks.",
+            file=sys.stderr,
+            flush=True,
+        )
 
     gold_rows = load_ifc_eval_csv(args.csv)
     if args.max_rows and args.max_rows > 0:

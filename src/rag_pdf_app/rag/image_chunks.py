@@ -30,6 +30,43 @@ def _chunk_id_for_image(img: ImageBlock, pdf_digest: str) -> str:
     return hashlib.sha256(blob).hexdigest()[:24]
 
 
+def _should_index_image(
+    *,
+    area: int,
+    caption: str,
+    above: str,
+    below: str,
+    min_area_px: int,
+) -> bool:
+    if not (caption or above or below):
+        return False
+    return not (area < min_area_px and not caption)
+
+
+def _compose_image_chunk_body(
+    img: ImageBlock,
+    *,
+    area: int,
+    caption: str,
+    above: str,
+    below: str,
+) -> str:
+    w = img.width_px or "?"
+    h = img.height_px or "?"
+    parts: list[str] = [
+        f"FIGURE · page {img.page_index + 1} · xref {img.xref} · {img.mime_type or 'image'}",
+        f"Approximate size: {w}×{h}px (area ≈ {area})",
+    ]
+    if caption:
+        model = img.caption_model or "unknown"
+        parts.append(f"Visual description (model: {model}):\n{caption}")
+    if above:
+        parts.append(f"Nearby document text (above figure): {above[:1200]}")
+    if below:
+        parts.append(f"Nearby document text (below figure): {below[:1200]}")
+    return "\n\n".join(parts).strip()
+
+
 def image_text_chunk_from_block(
     img: ImageBlock,
     *,
@@ -44,29 +81,18 @@ def image_text_chunk_from_block(
     caption = (img.caption or "").strip()
     above = (img.contextual_snippet_above or "").strip()
     below = (img.contextual_snippet_below or "").strip()
-    if area < min_area_px and not caption and not above and not below:
+    # Avoid indexing boilerplate-only blobs: large figures without captions/snippets dominated
+    # dense/BM25 pools with repeated generic text and diluted eval retrieval (Phase 5.2).
+    if not _should_index_image(
+        area=area,
+        caption=caption,
+        above=above,
+        below=below,
+        min_area_px=min_area_px,
+    ):
         return None
 
-    w = img.width_px or "?"
-    h = img.height_px or "?"
-    head_bits: list[str] = [
-        f"FIGURE · page {img.page_index + 1} · xref {img.xref} · {img.mime_type or 'image'}",
-        f"Approximate size: {w}×{h}px (area ≈ {area})",
-    ]
-    if caption:
-        model = img.caption_model or "unknown"
-        head_bits.append(f"Visual description (model: {model}):\n{caption}")
-    else:
-        head_bits.append(
-            "Visual description: (not available — enable Gemini image captions at ingest or "
-            "check Vertex quotas.)"
-        )
-    if above:
-        head_bits.append(f"Nearby document text (above figure): {above[:1200]}")
-    if below:
-        head_bits.append(f"Nearby document text (below figure): {below[:1200]}")
-
-    body = "\n\n".join(head_bits).strip()
+    body = _compose_image_chunk_body(img, area=area, caption=caption, above=above, below=below)
     if not body:
         return None
 
