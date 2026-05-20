@@ -14,9 +14,7 @@ import textwrap
 
 PAGE_TITLE = "PDF RAG Lab"
 TITLE = "PDF RAG workspace"
-CAPTION_MAIN = (
-    "Gemini · Vertex AI · hybrid retrieval (FAISS + Qdrant) · tables · figure captions"
-)
+CAPTION_MAIN = "Gemini · Vertex AI · hybrid retrieval (FAISS + Qdrant) · tables · figure captions"
 SIDEBAR_ENV_MARKDOWN_HEADING = "### Environment"
 SIDEBAR_ADC_INSTRUCTIONS_TEXT = """\
 Use GCP Application Default Credentials — no Gemini API keys.
@@ -90,9 +88,7 @@ RAG_EXPANDER_INGEST_NOTES = "Ingest notes"
 RAG_ERR_INGEST = "Ingest failed (Vertex, Qdrant reachability, or empty PDF)."
 
 RAG_RELOAD_FAISS_BUTTON = "Reload FAISS from disk"
-RAG_RELOAD_FAISS_SUCCESS = (
-    "Loaded FAISS index — ensure Qdrant already has the same collection."
-)
+RAG_RELOAD_FAISS_SUCCESS = "Loaded FAISS index — ensure Qdrant already has the same collection."
 RAG_ERR_FAISS_LOAD = "Could not load FAISS store."
 
 RAG_INFO_UPLOAD_OR_RELOAD_FAISS = (
@@ -111,27 +107,20 @@ RAG_CAPTION_CHART_SKIP_NUMERIC = (
 RAG_CAPTION_NO_CSV_PREVIEW_TEMPLATE = (
     "Plotting: no CSV-backed table in top FAISS hits ({plot_note})."
 )
-RAG_SUCCESS_SEMANTIC_CACHE = (
-    "Semantic cache hit — similar prior query (see retrieval notes)."
-)
+RAG_SUCCESS_SEMANTIC_CACHE = "Semantic cache hit — similar prior query (see retrieval notes)."
 RAG_CAPTION_SEMANTIC_SIM_TEMPLATE = "Cache cosine similarity ≈ **{sim:.3f}**"
 
 RAG_INFO_MULTI_HOP = "Multi-hop retrieval merged a second FAISS pass into context."
 RAG_CAPTION_LANGFUSE_TEMPLATE = (
-    "Langfuse trace: **{traced_label}** "
-    "(needs `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`)."
+    "Langfuse trace: **{traced_label}** (needs `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`)."
 )
 RAG_LANGFUSE_YES = "yes"
 RAG_LANGFUSE_NO = "no"
 
 RAG_METRIC_FAISS_LABEL = "FAISS retrieval ms"
 RAG_METRIC_QDRANT_LABEL = "Qdrant retrieval ms"
-RAG_FAISS_HIT_EXPANDER_TEMPLATE = (
-    "FAISS · {kind} · {chunk_prefix} · score {score:.4f}"
-)
-RAG_QDRANT_HIT_EXPANDER_TEMPLATE = (
-    "Qdrant · {chunk_prefix} · score {score:.4f}"
-)
+RAG_FAISS_HIT_EXPANDER_TEMPLATE = "FAISS · {kind} · {chunk_prefix} · score {score:.4f}"
+RAG_QDRANT_HIT_EXPANDER_TEMPLATE = "Qdrant · {chunk_prefix} · score {score:.4f}"
 RAG_HIT_TEXT_PREVIEW_CHARS = 2000
 RAG_EXPANDER_TRUNCATION_ELLIPSIS = "…"
 RAG_CHUNK_PREFIX_LEN = 12
@@ -163,8 +152,7 @@ DEFAULT_CHUNK_KIND = "narrative"
 # -----------------------------------------------------------------------------
 
 PHASE6_ERR_MISSING_PILLOW = (
-    "**Pillow** is missing (`pip install pillow` or "
-    "`uv sync --frozen --extra dev --extra phase6`)."
+    "**Pillow** is missing (`pip install pillow` or `uv sync --frozen --extra dev --extra phase6`)."
 )
 PHASE6_ERR_MISSING_SENTENCE_TRANSFORMERS = (
     "**sentence-transformers** is missing — run "
@@ -207,10 +195,7 @@ PHASE6_WARN_UPLOAD_FOR_INGEST = "Upload a PDF first."
 PHASE6_INGEST_SPINNER = "Rasterising patches + CLIP + Qdrant…"
 PHASE6_ERR_INGEST = "Phase 6 ingest failed (GPU/memory, Pillow, Torch, PDF)."
 PHASE6_INGEST_SUCCESS_TEMPLATE = (
-    "{patch_count} patches · "
-    "{vector_dimension}d · "
-    "Qdrant **`{collection}`** · "
-    "`{embedding_model}`"
+    "{patch_count} patches · {vector_dimension}d · Qdrant **`{collection}`** · `{embedding_model}`"
 )
 
 PHASE6_FORGET_SESSION_BUTTON = "Forget Phase 6 session PDF"
@@ -231,9 +216,7 @@ PHASE6_SLIDER_RERENDER_DPI_HELP = (
     "Higher DPI improves serif text clarity; ingest raster DPI stays tied to PHASE6_RENDER_DPI."
 )
 PHASE6_ASK_BUTTON = "Retrieve + answer (Gemini multimodal)"
-PHASE6_WARN_INGEST_FIRST = (
-    "Ingest Phase 6 for this PDF first (or re-upload after reload)."
-)
+PHASE6_WARN_INGEST_FIRST = "Ingest Phase 6 for this PDF first (or re-upload after reload)."
 PHASE6_WARN_NO_DIGEST = "Missing PDF digest — run Phase 6 ingest."
 PHASE6_WARN_EMPTY_QUESTION = "Enter a question."
 PHASE6_SPINNER_CLIP_RETRIEVE = "CLIP retrieve + patch crops…"
@@ -248,9 +231,7 @@ PHASE6_MARKDOWN_HEADING_SOURCES = "### Source attribution · rerendered crops"
 PHASE6_ATTR_LINE_PREFIX_TEMPLATE = (
     "**[P{idx}]** · PDF page **`{page}`** · patch tile **r{r_ix}c{c_ix}**"
 )
-PHASE6_ATTR_SCORE_RERANK_TEMPLATE = (
-    " · prefetch cos ≈ `{coarse:.4f}` · rerank `{score:.4f}`"
-)
+PHASE6_ATTR_SCORE_RERANK_TEMPLATE = " · prefetch cos ≈ `{coarse:.4f}` · rerank `{score:.4f}`"
 PHASE6_ATTR_SCORE_SIMPLE_TEMPLATE = " · score `{score:.4f}`"
 PHASE6_ERR_QUERY = "Phase 6 query failed."
 
@@ -271,5 +252,5 @@ shown crops vs textual passages to diagnose lexical vs spatial evidence mismatch
 
 
 def rag_faiss_hit_chunk_prefix(chunk_id: str) -> str:
-    cid = chunk_id[: RAG_CHUNK_PREFIX_LEN]
+    cid = chunk_id[:RAG_CHUNK_PREFIX_LEN]
     return f"{cid}{RAG_EXPANDER_TRUNCATION_ELLIPSIS}"

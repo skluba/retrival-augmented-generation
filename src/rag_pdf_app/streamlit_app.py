@@ -167,7 +167,9 @@ else:
                                     st.caption(uic.RAG_CAPTION_CHART_SKIP_NUMERIC)
                             else:
                                 st.caption(
-                                    uic.RAG_CAPTION_NO_CSV_PREVIEW_TEMPLATE.format(plot_note=plot_note)
+                                    uic.RAG_CAPTION_NO_CSV_PREVIEW_TEMPLATE.format(
+                                        plot_note=plot_note
+                                    )
                                 )
                         if result.semantic_cache_hit:
                             st.success(uic.RAG_SUCCESS_SEMANTIC_CACHE)
@@ -177,9 +179,7 @@ else:
                         if result.multi_hop_used:
                             st.info(uic.RAG_INFO_MULTI_HOP)
                         traced = (
-                            uic.RAG_LANGFUSE_YES
-                            if result.langfuse_traced
-                            else uic.RAG_LANGFUSE_NO
+                            uic.RAG_LANGFUSE_YES if result.langfuse_traced else uic.RAG_LANGFUSE_NO
                         )
                         st.caption(uic.RAG_CAPTION_LANGFUSE_TEMPLATE.format(traced_label=traced))
 
@@ -233,8 +233,13 @@ else:
         else:
             import io as _phase6_io
 
-            from rag_pdf_app.phase6.coords import patch_placement_from_payload, rerender_patch_png
+            from rag_pdf_app.phase6.coords import rerender_patch_png
             from rag_pdf_app.phase6.ingest_visual import ingest_phase6_visual_pdf
+            from rag_pdf_app.phase6.payload_display import (
+                SanitizedPhase6PatchDisplay,
+                sanitized_phase6_patch_display,
+                strict_float_metric,
+            )
             from rag_pdf_app.phase6.retrieve_visual import retrieve_phase6_visual_patches
             from rag_pdf_app.rag.stores import qdrant_client
 
@@ -294,8 +299,7 @@ else:
                 digest = str(st.session_state.get("phase6_pdf_sha256", ""))
                 digest_disp = digest[:18] + "…" if len(digest) > 18 else (digest or "?")
                 raw_name = str(
-                    st.session_state.get("phase6_source_name")
-                    or uic.PHASE6_UPLOAD_DEFAULT_FILENAME
+                    st.session_state.get("phase6_source_name") or uic.PHASE6_UPLOAD_DEFAULT_FILENAME
                 )
                 basename_safe = (
                     os.path.basename(raw_name) or raw_name or uic.PHASE6_UPLOAD_DEFAULT_FILENAME
@@ -338,6 +342,7 @@ else:
                     hits_local = []
                     telem_local: dict[str, str] = {}
                     thumbs: list[bytes] = []
+                    patch_display_safe: list[SanitizedPhase6PatchDisplay] = []
                     try:
                         with st.spinner(uic.PHASE6_SPINNER_CLIP_RETRIEVE):
                             hits_local, telem_local = retrieve_phase6_visual_patches(
@@ -348,15 +353,17 @@ else:
                                 device=None,
                             )
                             thumbs = []
+                            patch_display_safe = []
                             for hit in hits_local:
-                                pay = hit.payload
+                                safe = sanitized_phase6_patch_display(hit.payload or {})
+                                patch_display_safe.append(safe)
                                 thumbs.append(
                                     rerender_patch_png(
                                         pdf_buf_local,
-                                        patch_page_index=int(pay["page_index"]),
-                                        placement=patch_placement_from_payload(pay),
-                                        pixmap_page_width=int(pay["pixmap_page_width"]),
-                                        pixmap_page_height=int(pay["pixmap_page_height"]),
+                                        patch_page_index=safe.placement.page_index,
+                                        placement=safe.placement,
+                                        pixmap_page_width=safe.pixmap_page_width,
+                                        pixmap_page_height=safe.pixmap_page_height,
                                         dpi=float(rerender_dpi_slider),
                                     )
                                 )
@@ -381,27 +388,33 @@ else:
                             st.markdown(uic.PHASE6_MARKDOWN_HEADING_SOURCES)
                             for idx, png in enumerate(thumbs, start=1):
                                 hit = hits_local[idx - 1]
-                                pay = hit.payload
-                                pg = int(pay.get("page_index", 0)) + 1
-                                r_ix = pay.get("row_index")
-                                c_ix = pay.get("col_index")
+                                safe_dsp = patch_display_safe[idx - 1]
+                                pl = safe_dsp.placement
+                                pg = pl.page_index + 1
+                                r_ix = pl.row_index
+                                c_ix = pl.col_index
                                 cap = uic.PHASE6_ATTR_LINE_PREFIX_TEMPLATE.format(
                                     idx=idx,
                                     page=pg,
                                     r_ix=r_ix,
                                     c_ix=c_ix,
                                 )
+                                score_f = strict_float_metric(hit.score)
+                                coarse_f = (
+                                    strict_float_metric(hit.coarse_score)
+                                    if hit.coarse_score is not None
+                                    else None
+                                )
                                 if settings_obj.phase6_visual_maxsim_rerank and (
-                                    hit.coarse_score is not None
-                                    and abs(hit.coarse_score - hit.score) > 1e-6
+                                    coarse_f is not None and abs(coarse_f - score_f) > 1e-6
                                 ):
                                     cap += uic.PHASE6_ATTR_SCORE_RERANK_TEMPLATE.format(
-                                        coarse=hit.coarse_score,
-                                        score=hit.score,
+                                        coarse=coarse_f,
+                                        score=score_f,
                                     )
                                 else:
                                     cap += uic.PHASE6_ATTR_SCORE_SIMPLE_TEMPLATE.format(
-                                        score=hit.score,
+                                        score=score_f,
                                     )
                                 st.markdown(cap)
                                 st.image(
