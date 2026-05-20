@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from langchain_community.vectorstores import FAISS
 
 from rag_pdf_app.config import Settings
+from rag_pdf_app.parsing.pipeline import parse_pdf_bytes
 from rag_pdf_app.rag.chunking import build_chunks_from_pdf_bytes, chunks_to_langchain_payload
 from rag_pdf_app.rag.embeddings import vertex_embed_documents_batched, vertex_text_embeddings
 from rag_pdf_app.rag.stores import (
@@ -15,6 +16,10 @@ from rag_pdf_app.rag.stores import (
     reset_qdrant_collection,
     save_faiss_index,
     upsert_chunks_qdrant,
+)
+from rag_pdf_app.rag.table_chunks import (
+    merge_narrative_and_table_chunks,
+    table_text_chunks_from_parsed_pdf,
 )
 
 
@@ -47,6 +52,24 @@ def ingest_pdf_bytes_to_indexes(
         use_layout=use_layout_chunking,
     )
     notes.extend(cnotes)
+
+    if settings.rag_table_indexing_enabled:
+        parsed = parse_pdf_bytes(
+            pdf_bytes,
+            filename,
+            settings=settings,
+            embed_image_base64=False,
+            gemini_image_captions=False,
+            gemini_table_summaries=settings.rag_ingest_gemini_table_summaries,
+            run_docling=settings.rag_ingest_run_docling,
+            run_camelot=settings.rag_ingest_run_camelot,
+        )
+        tchunks = table_text_chunks_from_parsed_pdf(parsed)
+        chunks, merge_mode = merge_narrative_and_table_chunks(chunks, tchunks)
+        notes.append(f"table_index_merge:{merge_mode}")
+        notes.append(f"table_chunk_count:{len(tchunks)}")
+        notes.extend(f"table_parse_note:{n}" for n in parsed.parsing_notes)
+
     if not chunks:
         raise ValueError("No text extracted from PDF — cannot index.")
 

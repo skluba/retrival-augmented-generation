@@ -167,6 +167,36 @@ class Settings(BaseSettings):
         description="Second retrieval pass using an LLM-suggested follow-up query (FAISS merge).",
     )
 
+    # Phase 5.1 · Table indexing (parse PDF into table chunks alongside narrative windows).
+    rag_table_indexing_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("RAG_TABLE_INDEXING_ENABLED"),
+        description=(
+            "During ingest, run structured PDF parsing to emit extra chunks for detected tables "
+            "(PyMuPDF; optional Camelot when enabled)."
+        ),
+    )
+    rag_ingest_run_camelot: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("RAG_INGEST_RUN_CAMELOT"),
+        description="Camelot/Ghostscript table extraction for trusted PDFs only.",
+    )
+    rag_ingest_run_docling: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("RAG_INGEST_RUN_DOCLING"),
+        description="Optional Docling markdown span during ingest (heavy; improves some layouts).",
+    )
+    rag_ingest_gemini_table_summaries: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("RAG_INGEST_GEMINI_TABLE_SUMMARIES"),
+        description="Gemini short summaries for noisy tables before embedding.",
+    )
+    rag_plotting_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("RAG_PLOTTING_ENABLED"),
+        description="Streamlit: when retrieved passages include CSV previews, offer simple charts.",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

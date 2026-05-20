@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -37,4 +37,16 @@ class TextChunk(BaseModel):
     section_hint: str | None = Field(
         default=None,
         description="Approximate heading / first-line cue for display and light retrieval boosts.",
+    )
+    chunk_kind: Literal["narrative", "pdf_table"] = Field(
+        default="narrative",
+        description="Phase 5.1: pdf_table rows are structured table index chunks (Markdown/CSV bodies).",
+    )
+    table_id: str | None = Field(
+        default=None,
+        description="Set when chunk_kind is pdf_table (stable id from extractors).",
+    )
+    table_csv_preview: str | None = Field(
+        default=None,
+        description="Optional CSV snippet for UI charting (bounded at index time).",
     )

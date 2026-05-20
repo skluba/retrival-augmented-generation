@@ -246,6 +246,9 @@ def chunks_to_langchain_payload(chunks: list[TextChunk]) -> tuple[list[str], lis
                 "structure_note": c.structure_note,
                 "content_type": c.content_type,
                 "section_hint": c.section_hint,
+                "chunk_kind": c.chunk_kind,
+                "table_id": c.table_id,
+                "table_csv_preview": c.table_csv_preview,
             }
         )
     return texts, metas

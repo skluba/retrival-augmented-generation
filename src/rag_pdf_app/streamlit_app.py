@@ -221,12 +221,14 @@ else:
         from rag_pdf_app.rag.ingest import ingest_pdf_bytes_to_indexes
         from rag_pdf_app.rag.query import run_phase1_rag
         from rag_pdf_app.rag.stores import load_faiss_index
+        from rag_pdf_app.rag.table_plot import chartable_numeric_frame, dataframe_from_hits
 
-        st.subheader("Baseline RAG — IFC Annual Report (text only)")
+        st.subheader("Baseline RAG — IFC Annual Report (text + Phase 5.1 tables)")
         st.markdown(
             "**Provide the PDF via upload** (normal flow). Ingest runs once (Vertex embeddings → "
-            "**FAISS** on disk + **Qdrant**). Each question retrieves on **both** backends for "
-            "latency/score comparison; Gemini answers use **FAISS** hits."
+            "**FAISS** on disk + **Qdrant**). **Phase 5.1** adds indexed **table chunks** from "
+            "structured parsing (PyMuPDF; optional Camelot when enabled in `.env`). "
+            "Each question retrieves on **both** backends; Gemini answers use **FAISS** hits. "
             "\n\n**Phase 4 (`.env`, on by default):** `RAG_SEMANTIC_CACHE_ENABLED` reuses answers "
             "for similar questions (skipped when using page-window filters). "
             "`RAG_MULTI_HOP_ENABLED` runs a second retrieval pass after an LLM-suggested query. "
@@ -307,6 +309,30 @@ else:
                     else:
                         st.markdown("### Answer")
                         st.write(result.answer)
+                        if (
+                            not result.semantic_cache_hit
+                            and settings_obj.rag_plotting_enabled
+                        ):
+                            df_plot, plot_note = dataframe_from_hits(
+                                result.retrieval.faiss_hits,
+                                settings_obj,
+                            )
+                            if df_plot is not None:
+                                st.subheader("Chart · retrieved table preview")
+                                st.dataframe(df_plot.head(80), use_container_width=True)
+                                num_df = chartable_numeric_frame(df_plot)
+                                if not num_df.empty:
+                                    st.bar_chart(num_df.head(40))
+                                else:
+                                    st.caption(
+                                        "Numeric chart skipped — no numeric columns detected "
+                                        "(table still shown above)."
+                                    )
+                            else:
+                                st.caption(
+                                    "Plotting: no CSV-backed table in top FAISS hits "
+                                    f"({plot_note})."
+                                )
                         if result.semantic_cache_hit:
                             st.success(
                                 "Semantic cache hit — similar prior query (see retrieval notes)."
@@ -327,7 +353,11 @@ else:
                             st.metric("FAISS retrieval ms", f"{r.faiss_timing.latency_ms:.2f}")
                             st.caption(r.faiss_timing.metric)
                             for h in r.faiss_hits:
-                                title = f"FAISS · {h.chunk_id[:12]}… · score {h.score:.4f}"
+                                kind = h.metadata.get("chunk_kind", "narrative")
+                                title = (
+                                    f"FAISS · {kind} · {h.chunk_id[:12]}… · "
+                                    f"score {h.score:.4f}"
+                                )
                                 with st.expander(title):
                                     st.text(h.text[:2000])
                         with c2:
