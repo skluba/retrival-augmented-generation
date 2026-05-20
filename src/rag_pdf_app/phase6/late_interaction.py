@@ -21,7 +21,7 @@ def l2_normalize_rows(mat: np.ndarray) -> np.ndarray:
     import numpy as np_np
 
     norm = np_np.linalg.norm(mat, axis=1, keepdims=True)
-    norm[norm == 0.0] = 1.0
+    norm = np_np.maximum(norm, 1e-12)
     return mat / norm
 
 
